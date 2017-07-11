@@ -11,14 +11,15 @@ using System.IO;
 
 namespace BizHawk.Emulation.Cores.Consoles.Sega.PicoDrive
 {
-	[CoreAttributes("PicoDrive", "notaz", true, false,
+	[CoreAttributes("PicoDrive", "notaz", true, true,
 		"0e352905c7aa80b166933970abbcecfce96ad64e", "https://github.com/notaz/picodrive", false)]
-	public class PicoDrive : WaterboxCore, IDriveLight
+	public class PicoDrive : WaterboxCore, IDriveLight, IRegionable
 	{
 		private LibPicoDrive _core;
 		private LibPicoDrive.CDReadCallback _cdcallback;
 		private Disc _cd;
 		private DiscSectorReader _cdReader;
+		private bool _isPal;
 
 		[CoreConstructor("GEN")]
 		public PicoDrive(CoreComm comm, GameInfo game, byte[] rom, bool deterministic)
@@ -70,7 +71,7 @@ namespace BizHawk.Emulation.Cores.Consoles.Sega.PicoDrive
 				_exe.AddReadonlyFile(comm.CoreFileProvider.GetFirmware("GEN", "CD_BIOS_EU", true), "cd.eu");
 				_exe.AddReadonlyFile(comm.CoreFileProvider.GetFirmware("GEN", "CD_BIOS_US", true), "cd.us");
 				_exe.AddReadonlyFile(comm.CoreFileProvider.GetFirmware("GEN", "CD_BIOS_JP", true), "cd.jp");
-				_exe.AddReadonlyFile(gpgx64.GPGX.GetCDData(cd), "toc");
+				_exe.AddReadonlyFile(gpgx.GPGX.GetCDData(cd), "toc");
 				_cd = cd;
 				_cdReader = new DiscSectorReader(_cd);
 				_cdcallback = CDRead;
@@ -108,7 +109,13 @@ namespace BizHawk.Emulation.Cores.Consoles.Sega.PicoDrive
 			ControllerDefinition = PicoDriveController;
 			DeterministicEmulation = deterministic;
 			_core.SetCDReadCallback(_cdcallback);
+
+			_isPal = _core.IsPal();
+			VsyncNumerator = _isPal ? 53203424 : 53693175;
+			VsyncDenominator = _isPal ? 3420 * 313 : 3420 * 262;
 		}
+
+		public bool Is32xActive => _core.Is32xActive();
 
 		public static readonly ControllerDefinition PicoDriveController = new ControllerDefinition
 		{
@@ -171,6 +178,12 @@ namespace BizHawk.Emulation.Cores.Consoles.Sega.PicoDrive
 
 		public bool DriveLightEnabled { get; private set; }
 		public bool DriveLightOn { get; private set; }
+
+		#endregion
+
+		#region IRegionable
+
+		public DisplayType Region => _isPal ? DisplayType.PAL : DisplayType.NTSC;
 
 		#endregion
 	}

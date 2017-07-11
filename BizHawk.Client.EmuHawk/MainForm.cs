@@ -8,6 +8,8 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+using System.Net.Sockets;
+using System.Net;
 
 using BizHawk.Common;
 using BizHawk.Common.BufferExtensions;
@@ -35,431 +37,441 @@ using BizHawk.Emulation.Cores.Consoles.SNK;
 
 namespace BizHawk.Client.EmuHawk
 {
-	public partial class MainForm : Form
-	{
-		#region Constructors and Initialization, and Tear down
+    public partial class MainForm : Form
+    {
+        #region Constructors and Initialization, and Tear down
 
-		private void MainForm_Load(object sender, EventArgs e)
-		{
-			SetWindowText();
+        private void MainForm_Load(object sender, EventArgs e)
+        {
+            SetWindowText();
 
-			// Hide Status bar icons and general statusbar prep
-			MainStatusBar.Padding = new Padding(MainStatusBar.Padding.Left, MainStatusBar.Padding.Top, MainStatusBar.Padding.Left, MainStatusBar.Padding.Bottom); // Workaround to remove extra padding on right
-			PlayRecordStatusButton.Visible = false;
-			AVIStatusLabel.Visible = false;
-			SetPauseStatusbarIcon();
-			ToolFormBase.UpdateCheatRelatedTools(null, null);
-			RebootStatusBarIcon.Visible = false;
-			UpdateNotification.Visible = false;
-			_statusBarDiskLightOnImage = Properties.Resources.LightOn;
-			_statusBarDiskLightOffImage = Properties.Resources.LightOff;
-			_linkCableOn = Properties.Resources.connect_16x16;
-			_linkCableOff = Properties.Resources.noconnect_16x16;
-			UpdateCoreStatusBarButton();
-			if (Global.Config.FirstBoot)
-			{
-				ProfileFirstBootLabel.Visible = true;
-			}
+            // Hide Status bar icons and general statusbar prep
+            MainStatusBar.Padding = new Padding(MainStatusBar.Padding.Left, MainStatusBar.Padding.Top, MainStatusBar.Padding.Left, MainStatusBar.Padding.Bottom); // Workaround to remove extra padding on right
+            PlayRecordStatusButton.Visible = false;
+            AVIStatusLabel.Visible = false;
+            SetPauseStatusbarIcon();
+            ToolFormBase.UpdateCheatRelatedTools(null, null);
+            RebootStatusBarIcon.Visible = false;
+            UpdateNotification.Visible = false;
+            _statusBarDiskLightOnImage = Properties.Resources.LightOn;
+            _statusBarDiskLightOffImage = Properties.Resources.LightOff;
+            _linkCableOn = Properties.Resources.connect_16x16;
+            _linkCableOff = Properties.Resources.noconnect_16x16;
+            UpdateCoreStatusBarButton();
+            if (Global.Config.FirstBoot)
+            {
+                ProfileFirstBootLabel.Visible = true;
+            }
 
-			HandleToggleLightAndLink();
-			SetStatusBar();
+            HandleToggleLightAndLink();
+            SetStatusBar();
 
-			// New version notification
-			UpdateChecker.CheckComplete += (s2, e2) =>
-			{
-				if (IsDisposed)
-				{
-					return;
-				}
+            // New version notification
+            UpdateChecker.CheckComplete += (s2, e2) =>
+            {
+                if (IsDisposed)
+                {
+                    return;
+                }
 
-				this.BeginInvoke(() => { UpdateNotification.Visible = UpdateChecker.IsNewVersionAvailable; });
-			};
-			UpdateChecker.BeginCheck(); // Won't actually check unless enabled by user
-		}
+                this.BeginInvoke(() => { UpdateNotification.Visible = UpdateChecker.IsNewVersionAvailable; });
+            };
+            UpdateChecker.BeginCheck(); // Won't actually check unless enabled by user
+        }
 
-		static MainForm()
-		{
-			// If this isnt here, then our assemblyresolving hacks wont work due to the check for MainForm.INTERIM
-			// its.. weird. dont ask.
-		}
+        static MainForm()
+        {
+            // If this isnt here, then our assemblyresolving hacks wont work due to the check for MainForm.INTERIM
+            // its.. weird. dont ask.
+        }
 
-		private CoreComm CreateCoreComm()
-		{
-			CoreComm ret = new CoreComm(ShowMessageCoreComm, NotifyCoreComm)
-			{
-				ReleaseGLContext = o => GlobalWin.GLManager.ReleaseGLContext(o),
-				RequestGLContext = (major, minor, forward) => GlobalWin.GLManager.CreateGLContext(major, minor, forward),
-				ActivateGLContext = gl => GlobalWin.GLManager.Activate((GLManager.ContextRef)gl),
-				DeactivateGLContext = () => GlobalWin.GLManager.Deactivate()
-			};
-			return ret;
-		}
+        private CoreComm CreateCoreComm()
+        {
+            CoreComm ret = new CoreComm(ShowMessageCoreComm, NotifyCoreComm)
+            {
+                ReleaseGLContext = o => GlobalWin.GLManager.ReleaseGLContext(o),
+                RequestGLContext = (major, minor, forward) => GlobalWin.GLManager.CreateGLContext(major, minor, forward),
+                ActivateGLContext = gl => GlobalWin.GLManager.Activate((GLManager.ContextRef)gl),
+                DeactivateGLContext = () => GlobalWin.GLManager.Deactivate()
+            };
+            return ret;
+        }
 
-		public MainForm(string[] args)
-		{
-			GlobalWin.MainForm = this;
-			Global.Rewinder = new Rewinder
-			{
-				MessageCallback = GlobalWin.OSD.AddMessage
-			};
+        public MainForm(string[] args)
+        {
+            GlobalWin.MainForm = this;
+            Global.Rewinder = new Rewinder
+            {
+                MessageCallback = GlobalWin.OSD.AddMessage
+            };
 
-			Global.ControllerInputCoalescer = new ControllerInputCoalescer();
-			Global.FirmwareManager = new FirmwareManager();
-			Global.MovieSession = new MovieSession
-			{
-				Movie = MovieService.DefaultInstance,
-				MovieControllerAdapter = MovieService.DefaultInstance.LogGeneratorInstance().MovieControllerAdapter,
-				MessageCallback = GlobalWin.OSD.AddMessage,
-				AskYesNoCallback = StateErrorAskUser,
-				PauseCallback = PauseEmulator,
-				ModeChangedCallback = SetMainformMovieInfo
-			};
+            Global.ControllerInputCoalescer = new ControllerInputCoalescer();
+            Global.FirmwareManager = new FirmwareManager();
+            Global.MovieSession = new MovieSession
+            {
+                Movie = MovieService.DefaultInstance,
+                MovieControllerAdapter = MovieService.DefaultInstance.LogGeneratorInstance().MovieControllerAdapter,
+                MessageCallback = GlobalWin.OSD.AddMessage,
+                AskYesNoCallback = StateErrorAskUser,
+                PauseCallback = PauseEmulator,
+                ModeChangedCallback = SetMainformMovieInfo
+            };
 
-			Icon = Properties.Resources.logo;
-			InitializeComponent();
-			Global.Game = GameInfo.NullInstance;
-			if (Global.Config.ShowLogWindow)
-			{
-				LogConsole.ShowConsole();
-				DisplayLogWindowMenuItem.Checked = true;
-			}
+            Icon = Properties.Resources.logo;
+            InitializeComponent();
+            Global.Game = GameInfo.NullInstance;
+            if (Global.Config.ShowLogWindow)
+            {
+                LogConsole.ShowConsole();
+                DisplayLogWindowMenuItem.Checked = true;
+            }
 
-			_throttle = new Throttle();
+            _throttle = new Throttle();
 
-			Global.CheatList = new CheatCollection();
-			Global.CheatList.Changed += ToolFormBase.UpdateCheatRelatedTools;
+            Global.CheatList = new CheatCollection();
+            Global.CheatList.Changed += ToolFormBase.UpdateCheatRelatedTools;
 
-			UpdateStatusSlots();
-			UpdateKeyPriorityIcon();
+            UpdateStatusSlots();
+            UpdateKeyPriorityIcon();
 
-			// In order to allow late construction of this database, we hook up a delegate here to dearchive the data and provide it on demand
-			// we could background thread this later instead if we wanted to be real clever
-			NES.BootGodDB.GetDatabaseBytes = () =>
-			{
-				string xmlPath = Path.Combine(PathManager.GetExeDirectoryAbsolute(), "gamedb", "NesCarts.xml");
-				string x7zPath = Path.Combine(PathManager.GetExeDirectoryAbsolute(), "gamedb", "NesCarts.7z");
-				bool loadXml = File.Exists(xmlPath);
-				using (var nesCartFile = new HawkFile(loadXml ? xmlPath : x7zPath))
-				{
-					if (!loadXml)
-					{
-						nesCartFile.BindFirst();
-					}
+            // In order to allow late construction of this database, we hook up a delegate here to dearchive the data and provide it on demand
+            // we could background thread this later instead if we wanted to be real clever
+            NES.BootGodDB.GetDatabaseBytes = () =>
+            {
+                string xmlPath = Path.Combine(PathManager.GetExeDirectoryAbsolute(), "gamedb", "NesCarts.xml");
+                string x7zPath = Path.Combine(PathManager.GetExeDirectoryAbsolute(), "gamedb", "NesCarts.7z");
+                bool loadXml = File.Exists(xmlPath);
+                using (var nesCartFile = new HawkFile(loadXml ? xmlPath : x7zPath))
+                {
+                    if (!loadXml)
+                    {
+                        nesCartFile.BindFirst();
+                    }
 
-					return nesCartFile
-						.GetStream()
-						.ReadAllBytes();
-				}
-			};
+                    return nesCartFile
+                        .GetStream()
+                        .ReadAllBytes();
+                }
+            };
 
-			// TODO - replace this with some kind of standard dictionary-yielding parser in a separate component
-			string cmdRom = null;
-			string cmdLoadState = null;
-			string cmdLoadSlot = null;
-			string cmdMovie = null;
-			string cmdDumpType = null;
-			string cmdDumpName = null;
-			bool startFullscreen = false;
-			string luaScript = null;
-			bool luaConsole = false;
+            // TODO - replace this with some kind of standard dictionary-yielding parser in a separate component
+            string cmdRom = null;
+            string cmdLoadState = null;
+            string cmdLoadSlot = null;
+            string cmdMovie = null;
+            string cmdDumpType = null;
+            string cmdDumpName = null;
+            bool startFullscreen = false;
+            string luaScript = null;
+            bool luaConsole = false;
+            int socket_port = 9999;
+            string socket_ip = null;
 
-			for (int i = 0; i < args.Length; i++)
-			{
-				// For some reason sometimes visual studio will pass this to us on the commandline. it makes no sense.
-				if (args[i] == ">")
-				{
-					i++;
-					var stdout = args[i];
-					Console.SetOut(new StreamWriter(stdout));
-					continue;
-				}
+            for (int i = 0; i < args.Length; i++)
+            {
+                // For some reason sometimes visual studio will pass this to us on the commandline. it makes no sense.
+                if (args[i] == ">")
+                {
+                    i++;
+                    var stdout = args[i];
+                    Console.SetOut(new StreamWriter(stdout));
+                    continue;
+                }
 
-				var arg = args[i].ToLower();
-				if (arg.StartsWith("--load-slot="))
-				{
-					cmdLoadSlot = arg.Substring(arg.IndexOf('=') + 1);
-				}
+                var arg = args[i].ToLower();
+                if (arg.StartsWith("--load-slot="))
+                {
+                    cmdLoadSlot = arg.Substring(arg.IndexOf('=') + 1);
+                }
 
-				if (arg.StartsWith("--load-state="))
-				{
-					cmdLoadState = arg.Substring(arg.IndexOf('=') + 1);
-				}
-				else if (arg.StartsWith("--movie="))
-				{
-					cmdMovie = arg.Substring(arg.IndexOf('=') + 1);
-				}
-				else if (arg.StartsWith("--dump-type="))
-				{
-					cmdDumpType = arg.Substring(arg.IndexOf('=') + 1);
-				}
-				else if (arg.StartsWith("--dump-frames="))
-				{
-					var list = arg.Substring(arg.IndexOf('=') + 1);
-					var items = list.Split(',');
-					_currAviWriterFrameList = new HashSet<int>();
-					foreach (string item in items)
-					{
-						_currAviWriterFrameList.Add(int.Parse(item));
-					}
+                if (arg.StartsWith("--load-state="))
+                {
+                    cmdLoadState = arg.Substring(arg.IndexOf('=') + 1);
+                }
+                else if (arg.StartsWith("--movie="))
+                {
+                    cmdMovie = arg.Substring(arg.IndexOf('=') + 1);
+                }
+                else if (arg.StartsWith("--dump-type="))
+                {
+                    cmdDumpType = arg.Substring(arg.IndexOf('=') + 1);
+                }
+                else if (arg.StartsWith("--dump-frames="))
+                {
+                    var list = arg.Substring(arg.IndexOf('=') + 1);
+                    var items = list.Split(',');
+                    _currAviWriterFrameList = new HashSet<int>();
+                    foreach (string item in items)
+                    {
+                        _currAviWriterFrameList.Add(int.Parse(item));
+                    }
 
-					// automatically set dump length to maximum frame
-					_autoDumpLength = _currAviWriterFrameList.OrderBy(x => x).Last();
-				}
-				else if (arg.StartsWith("--dump-name="))
-				{
-					cmdDumpName = arg.Substring(arg.IndexOf('=') + 1);
-				}
-				else if (arg.StartsWith("--dump-length="))
-				{
-					int.TryParse(arg.Substring(arg.IndexOf('=') + 1), out _autoDumpLength);
-				}
-				else if (arg.StartsWith("--dump-close"))
-				{
-					_autoCloseOnDump = true;
-				}
-				else if (arg.StartsWith("--chromeless"))
-				{
-					_chromeless = true;
-				}
-				else if (arg.StartsWith("--fullscreen"))
-				{
-					startFullscreen = true;
-				}
-				else if (arg.StartsWith("--lua="))
-				{
-					luaScript = arg.Substring(arg.IndexOf('=') + 1);
-					luaConsole = true;
-				}
-				else if (arg.StartsWith("--luaconsole"))
-				{
-					luaConsole = true;
-				}
+                    // automatically set dump length to maximum frame
+                    _autoDumpLength = _currAviWriterFrameList.OrderBy(x => x).Last();
+                }
+                else if (arg.StartsWith("--dump-name="))
+                {
+                    cmdDumpName = arg.Substring(arg.IndexOf('=') + 1);
+                }
+                else if (arg.StartsWith("--dump-length="))
+                {
+                    int.TryParse(arg.Substring(arg.IndexOf('=') + 1), out _autoDumpLength);
+                }
+                else if (arg.StartsWith("--dump-close"))
+                {
+                    _autoCloseOnDump = true;
+                }
+                else if (arg.StartsWith("--chromeless"))
+                {
+                    _chromeless = true;
+                }
+                else if (arg.StartsWith("--fullscreen"))
+                {
+                    startFullscreen = true;
+                }
+                else if (arg.StartsWith("--lua="))
+                {
+                    luaScript = arg.Substring(arg.IndexOf('=') + 1);
+                    luaConsole = true;
+                }
+                else if (arg.StartsWith("--luaconsole"))
+                {
+                    luaConsole = true;
+                }
+                else if (arg.StartsWith("--socket_port"))
+                {
+                    int.TryParse(arg.Substring(arg.IndexOf('=') + 1), out socket_port);
+                }
+                else if (arg.StartsWith("--socket_ip"))
+                {
+                    socket_ip = arg.Substring(arg.IndexOf('=') + 1);
+                }
                 else
                 {
-					cmdRom = arg;
-				}
-			}
+                    cmdRom = arg;
+                }
+            }
 
             
+            Database.LoadDatabase(Path.Combine(PathManager.GetExeDirectoryAbsolute(), "gamedb", "gamedb.txt"));
 
-			Database.LoadDatabase(Path.Combine(PathManager.GetExeDirectoryAbsolute(), "gamedb", "gamedb.txt"));
+            // TODO GL - a lot of disorganized wiring-up here
+            CGC.CGCBinPath = Path.Combine(PathManager.GetDllDirectory(), "cgc.exe");
+            PresentationPanel = new PresentationPanel();
+            PresentationPanel.GraphicsControl.MainWindow = true;
+            GlobalWin.DisplayManager = new DisplayManager(PresentationPanel);
+            Controls.Add(PresentationPanel);
+            Controls.SetChildIndex(PresentationPanel, 0);
 
-			// TODO GL - a lot of disorganized wiring-up here
-			CGC.CGCBinPath = Path.Combine(PathManager.GetDllDirectory(), "cgc.exe");
-			PresentationPanel = new PresentationPanel();
-			PresentationPanel.GraphicsControl.MainWindow = true;
-			GlobalWin.DisplayManager = new DisplayManager(PresentationPanel);
-			Controls.Add(PresentationPanel);
-			Controls.SetChildIndex(PresentationPanel, 0);
+            // TODO GL - move these event handlers somewhere less obnoxious line in the On* overrides
+            Load += (o, e) =>
+            {
+                AllowDrop = true;
+                DragEnter += FormDragEnter;
+                DragDrop += FormDragDrop;
+            };
 
-			// TODO GL - move these event handlers somewhere less obnoxious line in the On* overrides
-			Load += (o, e) =>
-			{
-				AllowDrop = true;
-				DragEnter += FormDragEnter;
-				DragDrop += FormDragDrop;
-			};
+            Closing += (o, e) =>
+            {
+                if (GlobalWin.Tools.AskSave())
+                {
+                    // zero 03-nov-2015 - close game after other steps. tools might need to unhook themselves from a core.
+                    Global.MovieSession.Movie.Stop();
+                    GlobalWin.Tools.Close();
+                    CloseGame();
 
-			Closing += (o, e) =>
-			{
-				if (GlobalWin.Tools.AskSave())
-				{
-					// zero 03-nov-2015 - close game after other steps. tools might need to unhook themselves from a core.
-					Global.MovieSession.Movie.Stop();
-					GlobalWin.Tools.Close();
-					CloseGame();
+                    // does this need to be last for any particular reason? do tool dialogs persist settings when closing?
+                    SaveConfig();
+                }
+                else
+                {
+                    e.Cancel = true;
+                }
+            };
 
-					// does this need to be last for any particular reason? do tool dialogs persist settings when closing?
-					SaveConfig();
-				}
-				else
-				{
-					e.Cancel = true;
-				}
-			};
+            ResizeBegin += (o, e) =>
+            {
+                _inResizeLoop = true;
+                if (GlobalWin.Sound != null)
+                {
+                    GlobalWin.Sound.StopSound();
+                }
+            };
 
-			ResizeBegin += (o, e) =>
-			{
-				_inResizeLoop = true;
-				if (GlobalWin.Sound != null)
-				{
-					GlobalWin.Sound.StopSound();
-				}
-			};
+            Resize += (o, e) =>
+            {
+                SetWindowText();
+            };
 
-			Resize += (o, e) =>
-			{
-				SetWindowText();
-			};
+            ResizeEnd += (o, e) =>
+            {
+                _inResizeLoop = false;
+                SetWindowText();
 
-			ResizeEnd += (o, e) =>
-			{
-				_inResizeLoop = false;
-				SetWindowText();
+                if (PresentationPanel != null)
+                {
+                    PresentationPanel.Resized = true;
+                }
 
-				if (PresentationPanel != null)
-				{
-					PresentationPanel.Resized = true;
-				}
+                if (GlobalWin.Sound != null)
+                {
+                    GlobalWin.Sound.StartSound();
+                }
+            };
 
-				if (GlobalWin.Sound != null)
-				{
-					GlobalWin.Sound.StartSound();
-				}
-			};
+            Input.Initialize();
+            InitControls();
 
-			Input.Initialize();
-			InitControls();
+            var comm = CreateCoreComm();
+            CoreFileProvider.SyncCoreCommInputSignals(comm);
+            Emulator = new NullEmulator(comm, Global.Config.GetCoreSettings<NullEmulator>());
+            Global.ActiveController = new Controller(NullController.Instance.Definition);
+            Global.AutoFireController = _autofireNullControls;
+            Global.AutofireStickyXORAdapter.SetOnOffPatternFromConfig();
+            try
+            {
+                GlobalWin.Sound = new Sound(Handle);
+            }
+            catch
+            {
+                string message = "Couldn't initialize sound device! Try changing the output method in Sound config.";
+                if (Global.Config.SoundOutputMethod == Config.ESoundOutputMethod.DirectSound)
+                {
+                    message = "Couldn't initialize DirectSound! Things may go poorly for you. Try changing your sound driver to 44.1khz instead of 48khz in mmsys.cpl.";
+                }
 
-			var comm = CreateCoreComm();
-			CoreFileProvider.SyncCoreCommInputSignals(comm);
-			Emulator = new NullEmulator(comm, Global.Config.GetCoreSettings<NullEmulator>());
-			Global.ActiveController = new Controller(NullController.Instance.Definition);
-			Global.AutoFireController = _autofireNullControls;
-			Global.AutofireStickyXORAdapter.SetOnOffPatternFromConfig();
-			try
-			{
-				GlobalWin.Sound = new Sound(Handle);
-			}
-			catch
-			{
-				string message = "Couldn't initialize sound device! Try changing the output method in Sound config.";
-				if (Global.Config.SoundOutputMethod == Config.ESoundOutputMethod.DirectSound)
-				{
-					message = "Couldn't initialize DirectSound! Things may go poorly for you. Try changing your sound driver to 44.1khz instead of 48khz in mmsys.cpl.";
-				}
+                MessageBox.Show(message, "Initialization Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 
-				MessageBox.Show(message, "Initialization Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Global.Config.SoundOutputMethod = Config.ESoundOutputMethod.Dummy;
+                GlobalWin.Sound = new Sound(Handle);
+            }
 
-				Global.Config.SoundOutputMethod = Config.ESoundOutputMethod.Dummy;
-				GlobalWin.Sound = new Sound(Handle);
-			}
+            GlobalWin.Sound.StartSound();
+            InputManager.RewireInputChain();
+            GlobalWin.Tools = new ToolManager(this);
+            RewireSound();
 
-			GlobalWin.Sound.StartSound();
-			InputManager.RewireInputChain();
-			GlobalWin.Tools = new ToolManager(this);
-			RewireSound();
+            // Workaround for windows, location is -32000 when minimized, if they close it during this time, that's what gets saved
+            if (Global.Config.MainWndx == -32000)
+            {
+                Global.Config.MainWndx = 0;
+            }
 
-			// Workaround for windows, location is -32000 when minimized, if they close it during this time, that's what gets saved
-			if (Global.Config.MainWndx == -32000)
-			{
-				Global.Config.MainWndx = 0;
-			}
+            if (Global.Config.MainWndy == -32000)
+            {
+                Global.Config.MainWndy = 0;
+            }
 
-			if (Global.Config.MainWndy == -32000)
-			{
-				Global.Config.MainWndy = 0;
-			}
+            if (Global.Config.MainWndx != -1 && Global.Config.MainWndy != -1 && Global.Config.SaveWindowPosition)
+            {
+                Location = new Point(Global.Config.MainWndx, Global.Config.MainWndy);
+            }
 
-			if (Global.Config.MainWndx != -1 && Global.Config.MainWndy != -1 && Global.Config.SaveWindowPosition)
-			{
-				Location = new Point(Global.Config.MainWndx, Global.Config.MainWndy);
-			}
+            if (cmdRom != null)
+            {
+                // Commandline should always override auto-load
+                LoadRom(cmdRom, new LoadRomArgs { OpenAdvanced = new OpenAdvanced_OpenRom() });
+                if (Global.Game == null)
+                {
+                    MessageBox.Show("Failed to load " + cmdRom + " specified on commandline");
+                }
+            }
+            else if (Global.Config.RecentRoms.AutoLoad && !Global.Config.RecentRoms.Empty)
+            {
+                LoadRomFromRecent(Global.Config.RecentRoms.MostRecent);
+            }
 
-			if (cmdRom != null)
-			{
-				// Commandline should always override auto-load
-				LoadRom(cmdRom, new LoadRomArgs { OpenAdvanced = new OpenAdvanced_OpenRom() });
-				if (Global.Game == null)
-				{
-					MessageBox.Show("Failed to load " + cmdRom + " specified on commandline");
-				}
-			}
-			else if (Global.Config.RecentRoms.AutoLoad && !Global.Config.RecentRoms.Empty)
-			{
-				LoadRomFromRecent(Global.Config.RecentRoms.MostRecent);
-			}
+            if (cmdMovie != null)
+            {
+                _supressSyncSettingsWarning = true; // We dont' want to be nagged if we are attempting to automate
+                if (Global.Game == null)
+                {
+                    OpenRom();
+                }
 
-			if (cmdMovie != null)
-			{
-				_supressSyncSettingsWarning = true; // We dont' want to be nagged if we are attempting to automate
-				if (Global.Game == null)
-				{
-					OpenRom();
-				}
+                // If user picked a game, then do the commandline logic
+                if (!Global.Game.IsNullInstance)
+                {
+                    var movie = MovieService.Get(cmdMovie);
+                    Global.MovieSession.ReadOnly = true;
 
-				// If user picked a game, then do the commandline logic
-				if (!Global.Game.IsNullInstance)
-				{
-					var movie = MovieService.Get(cmdMovie);
-					Global.MovieSession.ReadOnly = true;
+                    // if user is dumping and didnt supply dump length, make it as long as the loaded movie
+                    if (_autoDumpLength == 0)
+                    {
+                        _autoDumpLength = movie.InputLogLength;
+                    }
 
-					// if user is dumping and didnt supply dump length, make it as long as the loaded movie
-					if (_autoDumpLength == 0)
-					{
-						_autoDumpLength = movie.InputLogLength;
-					}
+                    // Copy pasta from drag & drop
+                    if (MovieImport.IsValidMovieExtension(Path.GetExtension(cmdMovie)))
+                    {
+                        string errorMsg;
+                        string warningMsg;
+                        var imported = MovieImport.ImportFile(cmdMovie, out errorMsg, out warningMsg);
+                        if (!string.IsNullOrEmpty(errorMsg))
+                        {
+                            MessageBox.Show(errorMsg, "Conversion error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                        else
+                        {
+                            // fix movie extension to something palatable for these purposes. 
+                            // for instance, something which doesnt clobber movies you already may have had.
+                            // i'm evenly torn between this, and a file in %TEMP%, but since we dont really have a way to clean up this tempfile, i choose this:
+                            StartNewMovie(imported, false);
+                        }
 
-					// Copy pasta from drag & drop
-					if (MovieImport.IsValidMovieExtension(Path.GetExtension(cmdMovie)))
-					{
-						string errorMsg;
-						string warningMsg;
-						var imported = MovieImport.ImportFile(cmdMovie, out errorMsg, out warningMsg);
-						if (!string.IsNullOrEmpty(errorMsg))
-						{
-							MessageBox.Show(errorMsg, "Conversion error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-						}
-						else
-						{
-							// fix movie extension to something palatable for these purposes. 
-							// for instance, something which doesnt clobber movies you already may have had.
-							// i'm evenly torn between this, and a file in %TEMP%, but since we dont really have a way to clean up this tempfile, i choose this:
-							StartNewMovie(imported, false);
-						}
+                        GlobalWin.OSD.AddMessage(warningMsg);
+                    }
+                    else
+                    {
+                        StartNewMovie(movie, false);
+                        Global.Config.RecentMovies.Add(cmdMovie);
+                    }
 
-						GlobalWin.OSD.AddMessage(warningMsg);
-					}
-					else
-					{
-						StartNewMovie(movie, false);
-						Global.Config.RecentMovies.Add(cmdMovie);
-					}
+                    _supressSyncSettingsWarning = false;
+                }
+            }
+            else if (Global.Config.RecentMovies.AutoLoad && !Global.Config.RecentMovies.Empty)
+            {
+                if (Global.Game.IsNullInstance)
+                {
+                    OpenRom();
+                }
 
-					_supressSyncSettingsWarning = false;
-				}
-			}
-			else if (Global.Config.RecentMovies.AutoLoad && !Global.Config.RecentMovies.Empty)
-			{
-				if (Global.Game.IsNullInstance)
-				{
-					OpenRom();
-				}
+                // If user picked a game, then do the autoload logic
+                if (!Global.Game.IsNullInstance)
+                {
+                    if (File.Exists(Global.Config.RecentMovies.MostRecent))
+                    {
+                        StartNewMovie(MovieService.Get(Global.Config.RecentMovies.MostRecent), false);
+                    }
+                    else
+                    {
+                        Global.Config.RecentMovies.HandleLoadError(Global.Config.RecentMovies.MostRecent);
+                    }
+                }
+            }
 
-				// If user picked a game, then do the autoload logic
-				if (!Global.Game.IsNullInstance)
-				{
-					if (File.Exists(Global.Config.RecentMovies.MostRecent))
-					{
-						StartNewMovie(MovieService.Get(Global.Config.RecentMovies.MostRecent), false);
-					}
-					else
-					{
-						Global.Config.RecentMovies.HandleLoadError(Global.Config.RecentMovies.MostRecent);
-					}
-				}
-			}
+            if (startFullscreen || Global.Config.StartFullscreen)
+            {
+                _needsFullscreenOnLoad = true;
+            }
 
-			if (startFullscreen || Global.Config.StartFullscreen)
-			{
-				_needsFullscreenOnLoad = true;
-			}
+            if (!Global.Game.IsNullInstance)
+            {
+                if (cmdLoadState != null)
+                {
+                    LoadState(cmdLoadState, Path.GetFileName(cmdLoadState));
+                }
+                else if (cmdLoadSlot != null)
+                {
+                    LoadQuickSave("QuickSave" + cmdLoadSlot);
+                }
+                else if (Global.Config.AutoLoadLastSaveSlot)
+                {
+                    LoadQuickSave("QuickSave" + Global.Config.SaveSlot);
+                }
+            }
 
-			if (!Global.Game.IsNullInstance)
-			{
-				if (cmdLoadState != null)
-				{
-					LoadState(cmdLoadState, Path.GetFileName(cmdLoadState));
-				}
-				else if (cmdLoadSlot != null)
-				{
-					LoadQuickSave("QuickSave" + cmdLoadSlot);
-				}
-				else if (Global.Config.AutoLoadLastSaveSlot)
-				{
-					LoadQuickSave("QuickSave" + Global.Config.SaveSlot);
-				}
-			}
             //start Lua Console if requested in the command line arguments
             if (luaConsole)
             {
@@ -471,591 +483,621 @@ namespace BizHawk.Client.EmuHawk
                 GlobalWin.Tools.LuaConsole.LoadLuaFile(luaScript);
             }
 
-			GlobalWin.Tools.AutoLoad();
-
-			if (Global.Config.RecentWatches.AutoLoad)
-			{
-				GlobalWin.Tools.LoadRamWatch(!Global.Config.DisplayRamWatch);
-			}
-
-			if (Global.Config.RecentCheats.AutoLoad)
-			{
-				GlobalWin.Tools.Load<Cheats>();
-			}
-
-			SetStatusBar();
-
-			if (Global.Config.StartPaused)
-			{
-				PauseEmulator();
-			}
-
-			// start dumping, if appropriate
-			if (cmdDumpType != null && cmdDumpName != null)
-			{
-				RecordAv(cmdDumpType, cmdDumpName);
-			}
-
-			SetMainformMovieInfo();
-
-			SynchChrome();
-
-			PresentationPanel.Control.Paint += (o, e) =>
-			{
-				// I would like to trigger a repaint here, but this isnt done yet
-			};
-		}
-
-		private readonly bool _supressSyncSettingsWarning;
-
-		public int ProgramRunLoop()
-		{
-			CheckMessages(); // can someone leave a note about why this is needed?
-			LogConsole.PositionConsole();
-
-			// needs to be done late, after the log console snaps on top
-			// fullscreen should snap on top even harder!
-			if (_needsFullscreenOnLoad)
-			{
-				_needsFullscreenOnLoad = false;
-				ToggleFullscreen();
-			}
-
-			// incantation required to get the program reliably on top of the console window
-			// we might want it in ToggleFullscreen later, but here, it needs to happen regardless
-			BringToFront();
-			Activate();
-			BringToFront();
-
-			InitializeFpsData();
-
-			for (;;)
-			{
-				Input.Instance.Update();
-
-				// handle events and dispatch as a hotkey action, or a hotkey button, or an input button
-				ProcessInput();
-				Global.ClientControls.LatchFromPhysical(_hotkeyCoalescer);
-
-				Global.ActiveController.LatchFromPhysical(Global.ControllerInputCoalescer);
-
-				Global.ActiveController.ApplyAxisConstraints(
-					(Emulator is N64 && Global.Config.N64UseCircularAnalogConstraint) ? "Natural Circle" : null);
-
-				Global.ActiveController.OR_FromLogical(Global.ClickyVirtualPadController);
-				Global.AutoFireController.LatchFromPhysical(Global.ControllerInputCoalescer);
-
-				if (Global.ClientControls["Autohold"])
-				{
-					Global.StickyXORAdapter.MassToggleStickyState(Global.ActiveController.PressedButtons);
-					Global.AutofireStickyXORAdapter.MassToggleStickyState(Global.AutoFireController.PressedButtons);
-				}
-				else if (Global.ClientControls["Autofire"])
-				{
-					Global.AutofireStickyXORAdapter.MassToggleStickyState(Global.ActiveController.PressedButtons);
-				}
-
-				// autohold/autofire must not be affected by the following inputs
-				Global.ActiveController.Overrides(Global.LuaAndAdaptor);
-
-				if (GlobalWin.Tools.Has<LuaConsole>() && !SuppressLua)
-				{
-					GlobalWin.Tools.LuaConsole.ResumeScripts(false);
-				}
-
-				StepRunLoop_Core();
-				StepRunLoop_Throttle();
-
-				Render();
-
-				CheckMessages();
-
-				if (_exitRequestPending)
-				{
-					_exitRequestPending = false;
-					Close();
-				}
-
-				if (_exit)
-				{
-					break;
-				}
-
-				if (Global.Config.DispSpeedupFeatures != 0)
-				{
-					Thread.Sleep(0);
-				}
-			}
-
-			Shutdown();
-			return _exitCode;
-		}
-
-		/// <summary>
-		/// Clean up any resources being used.
-		/// </summary>
-		/// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
-		protected override void Dispose(bool disposing)
-		{
-			// NOTE: this gets called twice sometimes. once by using() in Program.cs and once from winforms internals when the form is closed...
-			if (GlobalWin.DisplayManager != null)
-			{
-				GlobalWin.DisplayManager.Dispose();
-				GlobalWin.DisplayManager = null;
-			}
-
-			if (disposing)
-			{
-				components?.Dispose();
-			}
-
-			base.Dispose(disposing);
-		}
-
-		#endregion
-
-		#region Pause
-
-		private bool _emulatorPaused;
-		public bool EmulatorPaused
-		{
-			get
-			{
-				return _emulatorPaused;
-			}
-
-			private set
-			{
-				if (_emulatorPaused && !value) // Unpausing
-				{
-					InitializeFpsData();
-				}
-
-				_emulatorPaused = value;
-				OnPauseChanged?.Invoke(this, new PauseChangedEventArgs(_emulatorPaused));
-			}
-		}
-
-		public delegate void PauseChangedEventHandler(object sender, PauseChangedEventArgs e);
-		public event PauseChangedEventHandler OnPauseChanged;
-
-		public class PauseChangedEventArgs : EventArgs
-		{
-			public PauseChangedEventArgs(bool paused)
-			{
-				Paused = paused;
-			}
-
-			public bool Paused { get; private set; }
-		}
-
-		#endregion
-
-		#region Properties
-
-		public string CurrentlyOpenRom { get; private set; } // todo - delete me and use only args instead
-		public LoadRomArgs CurrentlyOpenRomArgs { get; private set; }
-		public bool PauseAvi { get; set; }
-		public bool PressFrameAdvance { get; set; }
-		public bool HoldFrameAdvance { get; set; } // necessary for tastudio > button
-		public bool PressRewind { get; set; } // necessary for tastudio < button
-		public bool FastForward { get; set; }
-
-		// runloop won't exec lua
-		public bool SuppressLua { get; set; }
-
-		public long MouseWheelTracker { get; private set; }
-
-		private int? _pauseOnFrame;
-		public int? PauseOnFrame // If set, upon completion of this frame, the client wil pause
-		{
-			get
-			{
-				return _pauseOnFrame;
-			}
-
-			set
-			{
-				_pauseOnFrame = value;
-				SetPauseStatusbarIcon();
-
-				if (value == null) // TODO: make an Event handler instead, but the logic here is that after turbo seeking, tools will want to do a real update when the emulator finally pauses
-				{
-					bool skipScripts = !(Global.Config.TurboSeek && !Global.Config.RunLuaDuringTurbo && !SuppressLua);
-					GlobalWin.Tools.UpdateToolsBefore(skipScripts);
-					GlobalWin.Tools.UpdateToolsAfter(skipScripts);
-				}
-			}
-		}
-
-		public bool IsSeeking => PauseOnFrame.HasValue;
-
-		private bool IsTurboSeeking => PauseOnFrame.HasValue && Global.Config.TurboSeek;
-
-		private bool IsTurboing => Global.ClientControls["Turbo"] || IsTurboSeeking;
-
-		#endregion
-
-		#region Public Methods
-
-		public void ClearHolds()
-		{
-			Global.StickyXORAdapter.ClearStickies();
-			Global.AutofireStickyXORAdapter.ClearStickies();
-
-			if (GlobalWin.Tools.Has<VirtualpadTool>())
-			{
-				GlobalWin.Tools.VirtualPad.ClearVirtualPadHolds();
-			}
-		}
-
-		public void FlagNeedsReboot()
-		{
-			RebootStatusBarIcon.Visible = true;
-			GlobalWin.OSD.AddMessage("Core reboot needed for this setting");
-		}
-
-		/// <summary>
-		/// Controls whether the app generates input events. should be turned off for most modal dialogs
-		/// </summary>
-		public bool AllowInput(bool yieldAlt)
-		{
-			// the main form gets input
-			if (ActiveForm == this)
-			{
-				return true;
-			}
-
-			// even more special logic for TAStudio:
-			// TODO - implement by event filter in TAStudio
-			if (ActiveForm is TAStudio)
-			{
-				if (yieldAlt)
-				{
-					return false;
-				}
-
-				var ts = (TAStudio)ActiveForm;
-				if (ts.IsInMenuLoop)
-				{
-					return false;
-				}
-			}
-
-			// modals that need to capture input for binding purposes get input, of course
-			if (ActiveForm is HotkeyConfig
-				|| ActiveForm is ControllerConfig
-				|| ActiveForm is TAStudio
-				|| ActiveForm is VirtualpadTool)
-			{
-				return true;
-			}
-
-			// if no form is active on this process, then the background input setting applies
-			if (ActiveForm == null && Global.Config.AcceptBackgroundInput)
-			{
-				return true;
-			}
-
-			return false;
-		}
-
-		// TODO: make this an actual property, set it when loading a Rom, and pass it dialogs, etc
-		// This is a quick hack to reduce the dependency on Global.Emulator
-		private IEmulator Emulator
-		{
-			get
-			{
-				return Global.Emulator;
-			}
-
-			set
-			{
-				Global.Emulator = value;
-				_currentVideoProvider = Global.Emulator.AsVideoProviderOrDefault();
-				_currentSoundProvider = Global.Emulator.AsSoundProviderOrDefault();
-			}
-		}
-
-		private IVideoProvider _currentVideoProvider = NullVideo.Instance;
-
-		private ISoundProvider _currentSoundProvider = new NullSound(44100 / 60); // Reasonable default until we have a core instance
-
-		protected override void OnActivated(EventArgs e)
-		{
-			base.OnActivated(e);
-			Input.Instance.ControlInputFocus(this, Input.InputFocus.Mouse, true);
-		}
-
-		protected override void OnDeactivate(EventArgs e)
-		{
-			Input.Instance.ControlInputFocus(this, Input.InputFocus.Mouse, false);
-			base.OnDeactivate(e);
-		}
-
-		private void ProcessInput()
-		{
-			ControllerInputCoalescer conInput = (ControllerInputCoalescer)Global.ControllerInputCoalescer;
-
-			for (;;)
-			{
-				// loop through all available events
-				var ie = Input.Instance.DequeueEvent();
-				if (ie == null)
-				{
-					break;
-				}
-
-				// useful debugging:
-				// Console.WriteLine(ie);
-
-				// TODO - wonder what happens if we pop up something interactive as a response to one of these hotkeys? may need to purge further processing
-
-				// look for hotkey bindings for this key
-				var triggers = Global.ClientControls.SearchBindings(ie.LogicalButton.ToString());
-				if (triggers.Count == 0)
-				{
-					// Maybe it is a system alt-key which hasnt been overridden
-					if (ie.EventType == Input.InputEventType.Press)
-					{
-						if (ie.LogicalButton.Alt && ie.LogicalButton.Button.Length == 1)
-						{
-							var c = ie.LogicalButton.Button.ToLower()[0];
-							if ((c >= 'a' && c <= 'z') || c == ' ')
-							{
-								SendAltKeyChar(c);
-							}
-						}
-
-						if (ie.LogicalButton.Alt && ie.LogicalButton.Button == "Space")
-						{
-							SendPlainAltKey(32);
-						}
-					}
-
-					// ordinarily, an alt release with nothing else would move focus to the menubar. but that is sort of useless, and hard to implement exactly right.
-				}
-
-				// zero 09-sep-2012 - all input is eligible for controller input. not sure why the above was done. 
-				// maybe because it doesnt make sense to me to bind hotkeys and controller inputs to the same keystrokes
-
-				// adelikat 02-dec-2012 - implemented options for how to handle controller vs hotkey conflicts.  This is primarily motivated by computer emulation and thus controller being nearly the entire keyboard
-				bool handled;
-				switch (Global.Config.Input_Hotkey_OverrideOptions)
-				{
-					default:
-					case 0: // Both allowed
-						conInput.Receive(ie);
-
-						handled = false;
-						if (ie.EventType == Input.InputEventType.Press)
-						{
-							handled = triggers.Aggregate(handled, (current, trigger) => current | CheckHotkey(trigger));
-						}
-
-						// hotkeys which arent handled as actions get coalesced as pollable virtual client buttons
-						if (!handled)
-						{
-							_hotkeyCoalescer.Receive(ie);
-						}
-
-						break;
-					case 1: // Input overrides Hokeys
-						conInput.Receive(ie);
-						if (!Global.ActiveController.HasBinding(ie.LogicalButton.ToString()))
-						{
-							handled = false;
-							if (ie.EventType == Input.InputEventType.Press)
-							{
-								handled = triggers.Aggregate(handled, (current, trigger) => current | CheckHotkey(trigger));
-							}
-
-							// hotkeys which arent handled as actions get coalesced as pollable virtual client buttons
-							if (!handled)
-							{
-								_hotkeyCoalescer.Receive(ie);
-							}
-						}
-
-						break;
-					case 2: // Hotkeys override Input
-						handled = false;
-						if (ie.EventType == Input.InputEventType.Press)
-						{
-							handled = triggers.Aggregate(handled, (current, trigger) => current | CheckHotkey(trigger));
-						}
-
-						// hotkeys which arent handled as actions get coalesced as pollable virtual client buttons
-						if (!handled)
-						{
-							_hotkeyCoalescer.Receive(ie);
-
-							// Check for hotkeys that may not be handled through Checkhotkey() method, reject controller input mapped to these
-							if (!triggers.Any(IsInternalHotkey))
-							{
-								conInput.Receive(ie);
-							}
-						}
-
-						break;
-				}
-			} // foreach event
-
-			// also handle floats
-			conInput.AcceptNewFloats(Input.Instance.GetFloats().Select(o =>
-			{
-				// hackish
-				if (o.Item1 == "WMouse X")
-				{
-					var p = GlobalWin.DisplayManager.UntransformPoint(new Point((int)o.Item2, 0));
-					float x = p.X / (float)_currentVideoProvider.BufferWidth;
-					return new Tuple<string, float>("WMouse X", (x * 20000) - 10000);
-				}
-
-				if (o.Item1 == "WMouse Y")
-				{
-					var p = GlobalWin.DisplayManager.UntransformPoint(new Point(0, (int)o.Item2));
-					float y = p.Y / (float)_currentVideoProvider.BufferHeight;
-					return new Tuple<string, float>("WMouse Y", (y * 20000) - 10000);
-				}
-
-				return o;
-			}));
-		}
-
-		public void RebootCore()
-		{
-			var ioa = OpenAdvancedSerializer.ParseWithLegacy(_currentlyOpenRomPoopForAdvancedLoaderPleaseRefactorMe);
-			if (ioa is OpenAdvanced_LibretroNoGame)
-			{
-				LoadRom("", CurrentlyOpenRomArgs);
-			}
-			else
-			{
-				LoadRom(ioa.SimplePath, CurrentlyOpenRomArgs);
-			}
-		}
-
-		public void PauseEmulator()
-		{
-			EmulatorPaused = true;
-			SetPauseStatusbarIcon();
-		}
-
-		public void UnpauseEmulator()
-		{
-			EmulatorPaused = false;
-			SetPauseStatusbarIcon();
-		}
-
-		public void TogglePause()
-		{
-			EmulatorPaused ^= true;
-			SetPauseStatusbarIcon();
-
-			// TODO: have tastudio set a pause status change callback, or take control over pause
-			if (GlobalWin.Tools.Has<TAStudio>())
-			{
-				GlobalWin.Tools.UpdateValues<TAStudio>();
-			}
-		}
-
-		public byte[] CurrentFrameBuffer(bool captureOSD)
-		{
-			using (var bb = captureOSD ? CaptureOSD() : MakeScreenshotImage())
-			{
-				using (var img = bb.ToSysdrawingBitmap())
-				{
-					ImageConverter converter = new ImageConverter();
-					return (byte[])converter.ConvertTo(img, typeof(byte[]));
-				}
-			}
-		}
-
-		public void TakeScreenshotToClipboard()
-		{
-			using (var bb = Global.Config.Screenshot_CaptureOSD ? CaptureOSD() : MakeScreenshotImage())
-			{
-				using (var img = bb.ToSysdrawingBitmap())
-				{
-					Clipboard.SetImage(img);
-				}
-			}
-
-			GlobalWin.OSD.AddMessage("Screenshot (raw) saved to clipboard.");
-		}
-
-		private void TakeScreenshotClientToClipboard()
-		{
-			using (var bb = GlobalWin.DisplayManager.RenderOffscreen(_currentVideoProvider, Global.Config.Screenshot_CaptureOSD))
-			{
-				using (var img = bb.ToSysdrawingBitmap())
-				{
-					Clipboard.SetImage(img);
-				}
-			}
-
-			GlobalWin.OSD.AddMessage("Screenshot (client) saved to clipboard.");
-		}
-
-		public void TakeScreenshot()
-		{
-			string fmt = "{0}.{1:yyyy-MM-dd HH.mm.ss}{2}.png";
-			string prefix = PathManager.ScreenshotPrefix(Global.Game);
-			var ts = DateTime.Now;
-
-			string fnameBare = string.Format(fmt, prefix, ts, "");
-			string fname = string.Format(fmt, prefix, ts, " (0)");
-
-			// if the (0) filename exists, do nothing. we'll bump up the number later
-			// if the bare filename exists, move it to (0)
-			// otherwise, no related filename exists, and we can proceed with the bare filename
-			if (File.Exists(fname))
-			{
-			}
-			else if (File.Exists(fnameBare))
-			{
-				File.Move(fnameBare, fname);
-			}
-			else
-			{
-				fname = fnameBare;
-			}
-
-			int seq = 0;
-			while (File.Exists(fname))
-			{
-				var sequence = $" ({seq++})";
-				fname = string.Format(fmt, prefix, ts, sequence);
-			}
-
-			TakeScreenshot(fname);
-		}
-
-		public void TakeScreenshot(string path)
-		{
-			var fi = new FileInfo(path);
-			if (fi.Directory != null && !fi.Directory.Exists)
-			{
-				fi.Directory.Create();
-			}
-
-			using (var bb = Global.Config.Screenshot_CaptureOSD ? CaptureOSD() : MakeScreenshotImage())
-			{
-				using (var img = bb.ToSysdrawingBitmap())
-				{
-					img.Save(fi.FullName, ImageFormat.Png);
-				}
-			}
-
-			/*
+            GlobalWin.Tools.AutoLoad();
+
+            if (Global.Config.RecentWatches.AutoLoad)
+            {
+                GlobalWin.Tools.LoadRamWatch(!Global.Config.DisplayRamWatch);
+            }
+
+            if (Global.Config.RecentCheats.AutoLoad)
+            {
+                GlobalWin.Tools.Load<Cheats>();
+            }
+
+            SetStatusBar();
+
+            if (Global.Config.StartPaused)
+            {
+                PauseEmulator();
+            }
+
+            // start dumping, if appropriate
+            if (cmdDumpType != null && cmdDumpName != null)
+            {
+                RecordAv(cmdDumpType, cmdDumpName);
+            }
+
+            SetMainformMovieInfo();
+
+            SynchChrome();
+
+            PresentationPanel.Control.Paint += (o, e) =>
+            {
+                // I would like to trigger a repaint here, but this isnt done yet
+            };
+            if (socket_ip != null)
+            {
+                GlobalWin.socketServer.set_ip(socket_ip, socket_port);
+                GlobalWin.socketServer.initialize(_currentVideoProvider);
+                GlobalWin.socketServer.connect();
+            }
+        }
+
+        private readonly bool _supressSyncSettingsWarning;
+
+        public int ProgramRunLoop()
+        {
+            CheckMessages(); // can someone leave a note about why this is needed?
+            LogConsole.PositionConsole();
+
+            // needs to be done late, after the log console snaps on top
+            // fullscreen should snap on top even harder!
+            if (_needsFullscreenOnLoad)
+            {
+                _needsFullscreenOnLoad = false;
+                ToggleFullscreen();
+            }
+
+            // incantation required to get the program reliably on top of the console window
+            // we might want it in ToggleFullscreen later, but here, it needs to happen regardless
+            BringToFront();
+            Activate();
+            BringToFront();
+
+            InitializeFpsData();
+
+            for (;;)
+            {
+                Input.Instance.Update();
+
+                // handle events and dispatch as a hotkey action, or a hotkey button, or an input button
+                ProcessInput();
+                Global.ClientControls.LatchFromPhysical(_hotkeyCoalescer);
+
+                Global.ActiveController.LatchFromPhysical(Global.ControllerInputCoalescer);
+
+                Global.ActiveController.ApplyAxisConstraints(
+                    (Emulator is N64 && Global.Config.N64UseCircularAnalogConstraint) ? "Natural Circle" : null);
+
+                Global.ActiveController.OR_FromLogical(Global.ClickyVirtualPadController);
+                Global.AutoFireController.LatchFromPhysical(Global.ControllerInputCoalescer);
+
+                if (Global.ClientControls["Autohold"])
+                {
+                    Global.StickyXORAdapter.MassToggleStickyState(Global.ActiveController.PressedButtons);
+                    Global.AutofireStickyXORAdapter.MassToggleStickyState(Global.AutoFireController.PressedButtons);
+                }
+                else if (Global.ClientControls["Autofire"])
+                {
+                    Global.AutofireStickyXORAdapter.MassToggleStickyState(Global.ActiveController.PressedButtons);
+                }
+
+                // autohold/autofire must not be affected by the following inputs
+                Global.ActiveController.Overrides(Global.LuaAndAdaptor);
+
+                if (GlobalWin.Tools.Has<LuaConsole>() && !SuppressLua)
+                {
+                    GlobalWin.Tools.LuaConsole.ResumeScripts(false);
+                }
+
+                StepRunLoop_Core();
+                StepRunLoop_Throttle();
+
+                Render();
+
+                CheckMessages();
+
+                if (_exitRequestPending)
+                {
+                    _exitRequestPending = false;
+                    Close();
+                }
+
+                if (_exit)
+                {
+                    break;
+                }
+
+                if (Global.Config.DispSpeedupFeatures != 0)
+                {
+                    Thread.Sleep(0);
+                }
+            }
+
+            Shutdown();
+            return _exitCode;
+        }
+
+        /// <summary>
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            // NOTE: this gets called twice sometimes. once by using() in Program.cs and once from winforms internals when the form is closed...
+            if (GlobalWin.DisplayManager != null)
+            {
+                GlobalWin.DisplayManager.Dispose();
+                GlobalWin.DisplayManager = null;
+            }
+
+            if (disposing)
+            {
+                components?.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+
+        #endregion
+
+        #region Pause
+
+        private bool _emulatorPaused;
+        public bool EmulatorPaused
+        {
+            get
+            {
+                return _emulatorPaused;
+            }
+
+            private set
+            {
+                if (_emulatorPaused && !value) // Unpausing
+                {
+                    InitializeFpsData();
+                }
+
+                _emulatorPaused = value;
+                OnPauseChanged?.Invoke(this, new PauseChangedEventArgs(_emulatorPaused));
+            }
+        }
+
+        public delegate void PauseChangedEventHandler(object sender, PauseChangedEventArgs e);
+        public event PauseChangedEventHandler OnPauseChanged;
+
+        public class PauseChangedEventArgs : EventArgs
+        {
+            public PauseChangedEventArgs(bool paused)
+            {
+                Paused = paused;
+            }
+
+            public bool Paused { get; private set; }
+        }
+
+        #endregion
+
+        #region Properties
+
+        public string CurrentlyOpenRom { get; private set; } // todo - delete me and use only args instead
+        public LoadRomArgs CurrentlyOpenRomArgs { get; private set; }
+        public bool PauseAvi { get; set; }
+        public bool PressFrameAdvance { get; set; }
+        public bool HoldFrameAdvance { get; set; } // necessary for tastudio > button
+        public bool PressRewind { get; set; } // necessary for tastudio < button
+        public bool FastForward { get; set; }
+
+        // runloop won't exec lua
+        public bool SuppressLua { get; set; }
+
+        public long MouseWheelTracker { get; private set; }
+
+        private int? _pauseOnFrame;
+        public int? PauseOnFrame // If set, upon completion of this frame, the client wil pause
+        {
+            get
+            {
+                return _pauseOnFrame;
+            }
+
+            set
+            {
+                _pauseOnFrame = value;
+                SetPauseStatusbarIcon();
+
+                if (value == null) // TODO: make an Event handler instead, but the logic here is that after turbo seeking, tools will want to do a real update when the emulator finally pauses
+                {
+                    bool skipScripts = !(Global.Config.TurboSeek && !Global.Config.RunLuaDuringTurbo && !SuppressLua);
+                    GlobalWin.Tools.UpdateToolsBefore(skipScripts);
+                    GlobalWin.Tools.UpdateToolsAfter(skipScripts);
+                }
+            }
+        }
+
+        public bool IsSeeking => PauseOnFrame.HasValue;
+
+        private bool IsTurboSeeking => PauseOnFrame.HasValue && Global.Config.TurboSeek;
+
+        private bool IsTurboing => Global.ClientControls["Turbo"] || IsTurboSeeking;
+
+        #endregion
+
+        #region Public Methods
+
+        public void ClearHolds()
+        {
+            Global.StickyXORAdapter.ClearStickies();
+            Global.AutofireStickyXORAdapter.ClearStickies();
+
+            if (GlobalWin.Tools.Has<VirtualpadTool>())
+            {
+                GlobalWin.Tools.VirtualPad.ClearVirtualPadHolds();
+            }
+        }
+
+        public void FlagNeedsReboot()
+        {
+            RebootStatusBarIcon.Visible = true;
+            GlobalWin.OSD.AddMessage("Core reboot needed for this setting");
+        }
+
+        /// <summary>
+        /// Controls whether the app generates input events. should be turned off for most modal dialogs
+        /// </summary>
+        public bool AllowInput(bool yieldAlt)
+        {
+            // the main form gets input
+            if (ActiveForm == this)
+            {
+                return true;
+            }
+
+            // even more special logic for TAStudio:
+            // TODO - implement by event filter in TAStudio
+            if (ActiveForm is TAStudio)
+            {
+                if (yieldAlt)
+                {
+                    return false;
+                }
+
+                var ts = (TAStudio)ActiveForm;
+                if (ts.IsInMenuLoop)
+                {
+                    return false;
+                }
+            }
+
+            // modals that need to capture input for binding purposes get input, of course
+            if (ActiveForm is HotkeyConfig
+                || ActiveForm is ControllerConfig
+                || ActiveForm is TAStudio
+                || ActiveForm is VirtualpadTool)
+            {
+                return true;
+            }
+
+            // if no form is active on this process, then the background input setting applies
+            if (ActiveForm == null && Global.Config.AcceptBackgroundInput)
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        // TODO: make this an actual property, set it when loading a Rom, and pass it dialogs, etc
+        // This is a quick hack to reduce the dependency on Global.Emulator
+        private IEmulator Emulator
+        {
+            get
+            {
+                return Global.Emulator;
+            }
+
+            set
+            {
+                Global.Emulator = value;
+                _currentVideoProvider = Global.Emulator.AsVideoProviderOrDefault();
+                _currentSoundProvider = Global.Emulator.AsSoundProviderOrDefault();
+            }
+        }
+
+        private IVideoProvider _currentVideoProvider = NullVideo.Instance;
+
+        private ISoundProvider _currentSoundProvider = new NullSound(44100 / 60); // Reasonable default until we have a core instance
+
+        protected override void OnActivated(EventArgs e)
+        {
+            base.OnActivated(e);
+            Input.Instance.ControlInputFocus(this, Input.InputFocus.Mouse, true);
+        }
+
+        protected override void OnDeactivate(EventArgs e)
+        {
+            Input.Instance.ControlInputFocus(this, Input.InputFocus.Mouse, false);
+            base.OnDeactivate(e);
+        }
+
+        private void ProcessInput()
+        {
+            ControllerInputCoalescer conInput = (ControllerInputCoalescer)Global.ControllerInputCoalescer;
+
+            for (;;)
+            {
+                // loop through all available events
+                var ie = Input.Instance.DequeueEvent();
+                if (ie == null)
+                {
+                    break;
+                }
+
+                // useful debugging:
+                // Console.WriteLine(ie);
+
+                // TODO - wonder what happens if we pop up something interactive as a response to one of these hotkeys? may need to purge further processing
+
+                // look for hotkey bindings for this key
+                var triggers = Global.ClientControls.SearchBindings(ie.LogicalButton.ToString());
+                if (triggers.Count == 0)
+                {
+                    // Maybe it is a system alt-key which hasnt been overridden
+                    if (ie.EventType == Input.InputEventType.Press)
+                    {
+                        if (ie.LogicalButton.Alt && ie.LogicalButton.Button.Length == 1)
+                        {
+                            var c = ie.LogicalButton.Button.ToLower()[0];
+                            if ((c >= 'a' && c <= 'z') || c == ' ')
+                            {
+                                SendAltKeyChar(c);
+                            }
+                        }
+
+                        if (ie.LogicalButton.Alt && ie.LogicalButton.Button == "Space")
+                        {
+                            SendPlainAltKey(32);
+                        }
+                    }
+
+                    // ordinarily, an alt release with nothing else would move focus to the menubar. but that is sort of useless, and hard to implement exactly right.
+                }
+
+                // zero 09-sep-2012 - all input is eligible for controller input. not sure why the above was done. 
+                // maybe because it doesnt make sense to me to bind hotkeys and controller inputs to the same keystrokes
+
+                // adelikat 02-dec-2012 - implemented options for how to handle controller vs hotkey conflicts.  This is primarily motivated by computer emulation and thus controller being nearly the entire keyboard
+                bool handled;
+                switch (Global.Config.Input_Hotkey_OverrideOptions)
+                {
+                    default:
+                    case 0: // Both allowed
+                        conInput.Receive(ie);
+
+                        handled = false;
+                        if (ie.EventType == Input.InputEventType.Press)
+                        {
+                            handled = triggers.Aggregate(handled, (current, trigger) => current | CheckHotkey(trigger));
+                        }
+
+                        // hotkeys which arent handled as actions get coalesced as pollable virtual client buttons
+                        if (!handled)
+                        {
+                            _hotkeyCoalescer.Receive(ie);
+                        }
+
+                        break;
+                    case 1: // Input overrides Hokeys
+                        conInput.Receive(ie);
+                        if (!Global.ActiveController.HasBinding(ie.LogicalButton.ToString()))
+                        {
+                            handled = false;
+                            if (ie.EventType == Input.InputEventType.Press)
+                            {
+                                handled = triggers.Aggregate(handled, (current, trigger) => current | CheckHotkey(trigger));
+                            }
+
+                            // hotkeys which arent handled as actions get coalesced as pollable virtual client buttons
+                            if (!handled)
+                            {
+                                _hotkeyCoalescer.Receive(ie);
+                            }
+                        }
+
+                        break;
+                    case 2: // Hotkeys override Input
+                        handled = false;
+                        if (ie.EventType == Input.InputEventType.Press)
+                        {
+                            handled = triggers.Aggregate(handled, (current, trigger) => current | CheckHotkey(trigger));
+                        }
+
+                        // hotkeys which arent handled as actions get coalesced as pollable virtual client buttons
+                        if (!handled)
+                        {
+                            _hotkeyCoalescer.Receive(ie);
+
+                            // Check for hotkeys that may not be handled through Checkhotkey() method, reject controller input mapped to these
+                            if (!triggers.Any(IsInternalHotkey))
+                            {
+                                conInput.Receive(ie);
+                            }
+                        }
+
+                        break;
+                }
+            } // foreach event
+
+            // also handle floats
+            conInput.AcceptNewFloats(Input.Instance.GetFloats().Select(o =>
+            {
+                // hackish
+                if (o.Item1 == "WMouse X")
+                {
+                    var p = GlobalWin.DisplayManager.UntransformPoint(new Point((int)o.Item2, 0));
+                    float x = p.X / (float)_currentVideoProvider.BufferWidth;
+                    return new Tuple<string, float>("WMouse X", (x * 20000) - 10000);
+                }
+
+                if (o.Item1 == "WMouse Y")
+                {
+                    var p = GlobalWin.DisplayManager.UntransformPoint(new Point(0, (int)o.Item2));
+                    float y = p.Y / (float)_currentVideoProvider.BufferHeight;
+                    return new Tuple<string, float>("WMouse Y", (y * 20000) - 10000);
+                }
+
+                return o;
+            }));
+        }
+
+        public void RebootCore()
+        {
+            var ioa = OpenAdvancedSerializer.ParseWithLegacy(_currentlyOpenRomPoopForAdvancedLoaderPleaseRefactorMe);
+            if (ioa is OpenAdvanced_LibretroNoGame)
+            {
+                LoadRom("", CurrentlyOpenRomArgs);
+            }
+            else
+            {
+                LoadRom(ioa.SimplePath, CurrentlyOpenRomArgs);
+            }
+        }
+
+        public void PauseEmulator()
+        {
+            EmulatorPaused = true;
+            SetPauseStatusbarIcon();
+        }
+
+        public void UnpauseEmulator()
+        {
+            EmulatorPaused = false;
+            SetPauseStatusbarIcon();
+        }
+
+        public void TogglePause()
+        {
+            EmulatorPaused ^= true;
+            SetPauseStatusbarIcon();
+
+            // TODO: have tastudio set a pause status change callback, or take control over pause
+            if (GlobalWin.Tools.Has<TAStudio>())
+            {
+                GlobalWin.Tools.UpdateValues<TAStudio>();
+            }
+        }
+
+        public byte[] CurrentFrameBuffer(bool captureOSD)
+        {
+            using (var bb = captureOSD ? CaptureOSD() : MakeScreenshotImage())
+            {
+                using (var img = bb.ToSysdrawingBitmap())
+                {
+                    ImageConverter converter = new ImageConverter();
+                    return (byte[])converter.ConvertTo(img, typeof(byte[]));
+                }
+            }
+        }
+
+        public void TakeScreenshotToClipboard()
+        {
+            using (var bb = Global.Config.Screenshot_CaptureOSD ? CaptureOSD() : MakeScreenshotImage())
+            {
+                using (var img = bb.ToSysdrawingBitmap())
+                {
+                    Clipboard.SetImage(img);
+                }
+            }
+
+            GlobalWin.OSD.AddMessage("Screenshot (raw) saved to clipboard.");
+        }
+
+        private void TakeScreenshotClientToClipboard()
+        {
+            using (var bb = GlobalWin.DisplayManager.RenderOffscreen(_currentVideoProvider, Global.Config.Screenshot_CaptureOSD))
+            {
+                using (var img = bb.ToSysdrawingBitmap())
+                {
+                    Clipboard.SetImage(img);
+                }
+            }
+
+            GlobalWin.OSD.AddMessage("Screenshot (client) saved to clipboard.");
+        }
+
+        public void TakeScreenshot()
+        {
+            string fmt = "{0}.{1:yyyy-MM-dd HH.mm.ss}{2}.png";
+            string prefix = PathManager.ScreenshotPrefix(Global.Game);
+            var ts = DateTime.Now;
+
+            string fnameBare = string.Format(fmt, prefix, ts, "");
+            string fname = string.Format(fmt, prefix, ts, " (0)");
+
+            // if the (0) filename exists, do nothing. we'll bump up the number later
+            // if the bare filename exists, move it to (0)
+            // otherwise, no related filename exists, and we can proceed with the bare filename
+            if (File.Exists(fname))
+            {
+            }
+            else if (File.Exists(fnameBare))
+            {
+                File.Move(fnameBare, fname);
+            }
+            else
+            {
+                fname = fnameBare;
+            }
+
+            int seq = 0;
+            while (File.Exists(fname))
+            {
+                var sequence = $" ({seq++})";
+                fname = string.Format(fmt, prefix, ts, sequence);
+            }
+
+            TakeScreenshot(fname);
+        }
+
+        public void TakeScreenshot(string path)
+        {
+            var fi = new FileInfo(path);
+            if (fi.Directory != null && !fi.Directory.Exists)
+            {
+                fi.Directory.Create();
+            }
+
+            using (var bb = Global.Config.Screenshot_CaptureOSD ? CaptureOSD() : MakeScreenshotImage())
+            {
+                using (var img = bb.ToSysdrawingBitmap())
+                {
+                    img.Save(fi.FullName, ImageFormat.Png);
+                }
+            }
+
+            /*
 			using (var fs = new FileStream(path + "_test.bmp", FileMode.OpenOrCreate, FileAccess.Write))
 				QuickBmpFile.Save(Emulator.VideoProvider(), fs, r.Next(50, 500), r.Next(50, 500));
 			*/
-			GlobalWin.OSD.AddMessage(fi.Name + " saved.");
-		}
+            GlobalWin.OSD.AddMessage(fi.Name + " saved.");
+        }
+        
+        public string NeuralNet()
+		{
+			Socket soc = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+			System.Net.IPAddress ipAdd = System.Net.IPAddress.Parse("192.168.178.21");
+			System.Net.IPEndPoint remoteEP = new IPEndPoint(ipAdd, 9999);
+			soc.Connect(remoteEP);
+			GlobalWin.OSD.AddMessage(DateTime.Now.ToString("mm:ss:fff"));
+            using (var bb = MakeScreenshotImage())
+            {
+                using (var img = bb.ToSysdrawingBitmap())
+                {
+                    byte[] bmpBytes = ImageToByte(img);
+                    soc.Send(bmpBytes);
+                    byte[] receivedBytes = new byte[1024];
+                    int receivedLength = soc.Receive(receivedBytes);
+                    char[] chars = new char[receivedLength];
+                    Decoder d = Encoding.UTF8.GetDecoder();
+                    int charLen = d.GetChars(receivedBytes, 0, receivedLength, chars, 0);
+                    String recv = new String(chars);
+                    return recv;
+                }
+            }
+        }
 
-		public void FrameBufferResized()
+        public void FrameBufferResized()
 		{
 			// run this entire thing exactly twice, since the first resize may adjust the menu stacking
 			for (int i = 0; i < 2; i++)
@@ -2029,9 +2071,9 @@ namespace BizHawk.Client.EmuHawk
 			}
 		}
 
-		private BitmapBuffer MakeScreenshotImage()
+		public BitmapBuffer MakeScreenshotImage()
 		{
-			return GlobalWin.DisplayManager.RenderVideoProvider(_currentVideoProvider);
+            return GlobalWin.DisplayManager.RenderVideoProvider(_currentVideoProvider);
 		}
 
 		private void SaveSlotSelectedMessage()

@@ -8,6 +8,8 @@ using BizHawk.Common;
 using BizHawk.Emulation.Common;
 using BizHawk.Client.Common;
 
+using System.Windows.Forms;
+
 namespace BizHawk.Client.EmuHawk
 {
 	[Description("A library for manipulating the EmuHawk client UI")]
@@ -241,7 +243,29 @@ namespace BizHawk.Client.EmuHawk
 			}
 		}
 
-		[LuaMethodAttributes("screenshottoclipboard", "Performs the same function as EmuHawk's Screenshot To Clipboard menu item")]
+		[LuaMethodAttributes("neuralnet", "bla XXX neuralnet")]
+		public static string NeuralNet()
+		{
+			return GlobalWin.MainForm.NeuralNet();
+		}
+        [LuaMethodAttributes("SocketServerScreenShot", "send a screen shot to the Socket server")]
+        public static string SocketServerScreenShot()
+        {
+            GlobalWin.socketServer.send_screenshot();
+            return "done";
+        }
+        [LuaMethodAttributes("SocketServerResponse", "receives a message from the Socket server")]
+        public static string SocketServerResponse()
+        {
+            return GlobalWin.socketServer.receive_message();
+        }
+        [LuaMethodAttributes("SocketServerConnect", "(re)connects to the Socket server")]
+        public static string SocketServerConnect()
+        {
+            GlobalWin.socketServer.reconnect();
+            return "done";
+        }
+        [LuaMethodAttributes("screenshottoclipboard", "Performs the same function as EmuHawk's Screenshot To Clipboard menu item")]
 		public static void ScreenshotToClipboard()
 		{
 			GlobalWin.MainForm.TakeScreenshotToClipboard();

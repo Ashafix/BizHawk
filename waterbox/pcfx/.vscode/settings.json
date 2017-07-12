@@ -5,6 +5,11 @@
 	"editor.detectIndentation": false,
 	"files.associations": {
 		"*.inc": "cpp",
-		"system_error": "cpp"
+		"system_error": "cpp",
+		"ios": "cpp",
+		"xiosbase": "cpp",
+		"iosfwd": "cpp",
+		"xlocale": "cpp",
+		"xstring": "cpp"
 	}
 }

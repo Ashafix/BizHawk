@@ -343,8 +343,8 @@ static MDFN_COLD void LoadCommon(std::vector<CDIF *> *CDInterfaces, const uint8_
 	uint32 RAM_Map_Addresses[1] = {0x00000000};
 	uint32 BIOSROM_Map_Addresses[1] = {0xFFF00000};
 
-	RAM = PCFX_V810.SetFastMap(RAM_Map_Addresses, 0x00200000, 1, _("RAM"));
-	BIOSROM = PCFX_V810.SetFastMap(BIOSROM_Map_Addresses, 0x00100000, 1, _("BIOS ROM"));
+	RAM = PCFX_V810.SetFastMap(RAM_Map_Addresses, 0x00200000, 1, _("RAM"), true);
+	BIOSROM = PCFX_V810.SetFastMap(BIOSROM_Map_Addresses, 0x00100000, 1, _("BIOS ROM"), false);
 
 	memcpy(BIOSROM, bios, 1024 * 1024);
 
@@ -356,7 +356,7 @@ static MDFN_COLD void LoadCommon(std::vector<CDIF *> *CDInterfaces, const uint8_
 			FileStream FXSCSIFile(fxscsi_path, FileStream::MODE_READ);
 			uint32 FXSCSI_Map_Addresses[1] = {0x80780000};
 
-			FXSCSIROM = PCFX_V810.SetFastMap(FXSCSI_Map_Addresses, 0x0080000, 1, _("FX-SCSI ROM"));
+			FXSCSIROM = PCFX_V810.SetFastMap(FXSCSI_Map_Addresses, 0x0080000, 1, _("FX-SCSI ROM"), false);
 
 			FXSCSIFile.read(FXSCSIROM, 1024 * 512);
 		}
@@ -669,13 +669,13 @@ class MyCDIF : public CDIF
 static std::vector<CDIF *> CDInterfaces;
 static uint32_t InputData[8];
 
-struct MyFrameInfo: public FrameInfo
+struct MyFrameInfo : public FrameInfo
 {
 	uint32_t Buttons[3]; // port 1, port 2, console
 };
 static EmulateSpecStruct Ess;
 static int32_t LineWidths[480];
-static uint32_t FrameBuffer[1024 * 480];
+ECL_INVISIBLE static uint32_t FrameBuffer[1024 * 480];
 
 EXPORT bool Init(int numDisks, const uint8_t *bios)
 {
@@ -692,7 +692,7 @@ EXPORT bool Init(int numDisks, const uint8_t *bios)
 	// multitap is experimental emulation for a never release peripheral, so let's ignore it for now
 	FXINPUT_SetMultitap(false, false);
 	for (int i = 0; i < 2; i++)
-		FXINPUT_SetInput(i, 1, &InputData[i]); // FXIT_GAMEPAD
+		FXINPUT_SetInput(i, Setting_PortDevice[i], &InputData[i]); // FXIT_GAMEPAD
 
 	PCFX_Power();
 	Ess.pixels = FrameBuffer;
@@ -706,14 +706,14 @@ EXPORT bool Init(int numDisks, const uint8_t *bios)
 static int ActiveDisk;
 static uint32_t PrevConsoleButtons;
 
-EXPORT void FrameAdvance(MyFrameInfo& f)
+EXPORT void FrameAdvance(MyFrameInfo &f)
 {
 	for (int i = 0; i < 2; i++)
 		InputData[i] = f.Buttons[i];
 	Lagged = true;
 	uint32_t ConsoleButtons = f.Buttons[2];
 	int NewActiveDisk = ActiveDisk;
-	#define ROSE(n) ((ConsoleButtons & 1 << (n)) > (PrevConsoleButtons & 1 << (n)))
+#define ROSE(n) ((ConsoleButtons & 1 << (n)) > (PrevConsoleButtons & 1 << (n)))
 	if (ROSE(0))
 		PCFX_Power();
 	if (ROSE(1))
@@ -722,7 +722,7 @@ EXPORT void FrameAdvance(MyFrameInfo& f)
 		NewActiveDisk--;
 	if (ROSE(3))
 		NewActiveDisk++;
-	#undef ROSE
+#undef ROSE
 	NewActiveDisk = std::max(NewActiveDisk, -1);
 	NewActiveDisk = std::min<int>(NewActiveDisk, CDInterfaces.size() - 1);
 	if (NewActiveDisk != ActiveDisk)
@@ -738,8 +738,8 @@ EXPORT void FrameAdvance(MyFrameInfo& f)
 	f.Samples = Ess.SoundBufSize;
 	f.Lagged = Lagged;
 
-	const uint32_t* src = FrameBuffer;
-	uint32_t* dst = f.VideoBuffer;
+	const uint32_t *src = FrameBuffer;
+	uint32_t *dst = f.VideoBuffer;
 	const int srcp = 1024;
 	const int dstp = Ess.w;
 	src += Ess.y * srcp + Ess.x;
@@ -805,20 +805,51 @@ EXPORT void SetInputCallback(void (*callback)())
 }
 
 // settings
-int Setting_HighDotclockWidth = 341;
-int Setting_CdSpeed = 2;
-int Setting_SlStart = 4;
-int Setting_SlEnd = 235;
+ECL_SEALED int Setting_HighDotclockWidth = 341;
+ECL_SEALED int Setting_CdSpeed = 2;
+ECL_SEALED int Setting_SlStart = 4;
+ECL_SEALED int Setting_SlEnd = 235;
 
-double Setting_ResampRateError = 0.0000009;
-int Setting_ResampQuality = 3;
+ECL_SEALED double Setting_ResampRateError = 0.0000009;
+ECL_SEALED int Setting_ResampQuality = 3;
 
-int Setting_CpuEmulation = 2; // 0 = fast, 1 = accurate, 2 = auto
-bool Setting_NoSpriteLimit;
-bool Setting_AdpcmBuggy = false;
-bool Setting_AdpcmNoClicks = true;
-bool Setting_ChromaInterpolate = false;
+ECL_SEALED int Setting_CpuEmulation = 2; // 0 = fast, 1 = accurate, 2 = auto
+ECL_SEALED bool Setting_NoSpriteLimit;
+ECL_SEALED bool Setting_AdpcmBuggy = false;
+ECL_SEALED bool Setting_AdpcmNoClicks = true;
+ECL_SEALED bool Setting_ChromaInterpolate = false;
 
+ECL_SEALED int Setting_PortDevice[2];
+
+struct FrontendSettings
+{
+	int32_t AdpcmEmulateBuggyCodec;
+	int32_t AdpcmSuppressChannelResetClicks;
+	int32_t HiResEmulation;
+	int32_t DisableSpriteLimit;
+	int32_t ChromaInterpolation;
+	int32_t ScanlineStart;
+	int32_t ScanlineEnd;
+	int32_t CdSpeed;
+	int32_t CpuEmulation;
+	int32_t Port1;
+	int32_t Port2;
+};
+
+EXPORT void PutSettingsBeforeInit(const FrontendSettings &s)
+{
+	Setting_AdpcmBuggy = s.AdpcmEmulateBuggyCodec;
+	Setting_AdpcmNoClicks = s.AdpcmSuppressChannelResetClicks;
+	Setting_HighDotclockWidth = s.HiResEmulation;
+	Setting_NoSpriteLimit = s.DisableSpriteLimit;
+	Setting_ChromaInterpolate = s.ChromaInterpolation;
+	Setting_SlStart = s.ScanlineStart;
+	Setting_SlEnd = s.ScanlineEnd;
+	Setting_CdSpeed = s.CdSpeed;
+	Setting_CpuEmulation = s.CpuEmulation;
+	Setting_PortDevice[0] = s.Port1;
+	Setting_PortDevice[1] = s.Port2;
+}
 
 /*MDFNGI EmulatedPCFX =
 	{

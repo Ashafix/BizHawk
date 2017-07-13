@@ -152,93 +152,8 @@ namespace BizHawk.Client.EmuHawk
 				}
 			};
 
-			// TODO - replace this with some kind of standard dictionary-yielding parser in a separate component
-			string cmdRom = null;
-			string cmdLoadState = null;
-			string cmdLoadSlot = null;
-			string cmdMovie = null;
-			string cmdDumpType = null;
-			string cmdDumpName = null;
-			bool startFullscreen = false;
-			string luaScript = null;
-			bool luaConsole = false;
-
-			for (int i = 0; i < args.Length; i++)
-			{
-				// For some reason sometimes visual studio will pass this to us on the commandline. it makes no sense.
-				if (args[i] == ">")
-				{
-					i++;
-					var stdout = args[i];
-					Console.SetOut(new StreamWriter(stdout));
-					continue;
-				}
-
-				var arg = args[i].ToLower();
-				if (arg.StartsWith("--load-slot="))
-				{
-					cmdLoadSlot = arg.Substring(arg.IndexOf('=') + 1);
-				}
-
-				if (arg.StartsWith("--load-state="))
-				{
-					cmdLoadState = arg.Substring(arg.IndexOf('=') + 1);
-				}
-				else if (arg.StartsWith("--movie="))
-				{
-					cmdMovie = arg.Substring(arg.IndexOf('=') + 1);
-				}
-				else if (arg.StartsWith("--dump-type="))
-				{
-					cmdDumpType = arg.Substring(arg.IndexOf('=') + 1);
-				}
-				else if (arg.StartsWith("--dump-frames="))
-				{
-					var list = arg.Substring(arg.IndexOf('=') + 1);
-					var items = list.Split(',');
-					_currAviWriterFrameList = new HashSet<int>();
-					foreach (string item in items)
-					{
-						_currAviWriterFrameList.Add(int.Parse(item));
-					}
-
-					// automatically set dump length to maximum frame
-					_autoDumpLength = _currAviWriterFrameList.OrderBy(x => x).Last();
-				}
-				else if (arg.StartsWith("--dump-name="))
-				{
-					cmdDumpName = arg.Substring(arg.IndexOf('=') + 1);
-				}
-				else if (arg.StartsWith("--dump-length="))
-				{
-					int.TryParse(arg.Substring(arg.IndexOf('=') + 1), out _autoDumpLength);
-				}
-				else if (arg.StartsWith("--dump-close"))
-				{
-					_autoCloseOnDump = true;
-				}
-				else if (arg.StartsWith("--chromeless"))
-				{
-					_chromeless = true;
-				}
-				else if (arg.StartsWith("--fullscreen"))
-				{
-					startFullscreen = true;
-				}
-				else if (arg.StartsWith("--lua="))
-				{
-					luaScript = arg.Substring(arg.IndexOf('=') + 1);
-					luaConsole = true;
-				}
-				else if (arg.StartsWith("--luaconsole"))
-				{
-					luaConsole = true;
-				}
-				else
-				{
-					cmdRom = arg;
-				}
-			}
+			ArgParser argParse = new ArgParser();
+			argParse.parseArguments(args);
 
 			Database.LoadDatabase(Path.Combine(PathManager.GetExeDirectoryAbsolute(), "gamedb", "gamedb.txt"));
 
@@ -354,13 +269,13 @@ namespace BizHawk.Client.EmuHawk
 				Location = new Point(Global.Config.MainWndx, Global.Config.MainWndy);
 			}
 
-			if (cmdRom != null)
+			if (argParse.cmdRom != null)
 			{
 				// Commandline should always override auto-load
-				LoadRom(cmdRom, new LoadRomArgs { OpenAdvanced = new OpenAdvanced_OpenRom() });
+				LoadRom(argParse.cmdRom, new LoadRomArgs { OpenAdvanced = new OpenAdvanced_OpenRom() });
 				if (Global.Game == null)
 				{
-					MessageBox.Show("Failed to load " + cmdRom + " specified on commandline");
+					MessageBox.Show("Failed to load " + argParse.cmdRom + " specified on commandline");
 				}
 			}
 			else if (Global.Config.RecentRoms.AutoLoad && !Global.Config.RecentRoms.Empty)
@@ -368,7 +283,7 @@ namespace BizHawk.Client.EmuHawk
 				LoadRomFromRecent(Global.Config.RecentRoms.MostRecent);
 			}
 
-			if (cmdMovie != null)
+			if (argParse.cmdMovie != null)
 			{
 				_supressSyncSettingsWarning = true; // We dont' want to be nagged if we are attempting to automate
 				if (Global.Game == null)
@@ -379,7 +294,7 @@ namespace BizHawk.Client.EmuHawk
 				// If user picked a game, then do the commandline logic
 				if (!Global.Game.IsNullInstance)
 				{
-					var movie = MovieService.Get(cmdMovie);
+					var movie = MovieService.Get(argParse.cmdMovie);
 					Global.MovieSession.ReadOnly = true;
 
 					// if user is dumping and didnt supply dump length, make it as long as the loaded movie
@@ -389,11 +304,11 @@ namespace BizHawk.Client.EmuHawk
 					}
 
 					// Copy pasta from drag & drop
-					if (MovieImport.IsValidMovieExtension(Path.GetExtension(cmdMovie)))
+					if (MovieImport.IsValidMovieExtension(Path.GetExtension(argParse.cmdMovie)))
 					{
 						string errorMsg;
 						string warningMsg;
-						var imported = MovieImport.ImportFile(cmdMovie, out errorMsg, out warningMsg);
+						var imported = MovieImport.ImportFile(argParse.cmdMovie, out errorMsg, out warningMsg);
 						if (!string.IsNullOrEmpty(errorMsg))
 						{
 							MessageBox.Show(errorMsg, "Conversion error", MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -411,7 +326,7 @@ namespace BizHawk.Client.EmuHawk
 					else
 					{
 						StartNewMovie(movie, false);
-						Global.Config.RecentMovies.Add(cmdMovie);
+						Global.Config.RecentMovies.Add(argParse.cmdMovie);
 					}
 
 					_supressSyncSettingsWarning = false;
@@ -438,20 +353,20 @@ namespace BizHawk.Client.EmuHawk
 				}
 			}
 
-			if (startFullscreen || Global.Config.StartFullscreen)
+			if (argParse.startFullscreen || Global.Config.StartFullscreen)
 			{
 				_needsFullscreenOnLoad = true;
 			}
 
 			if (!Global.Game.IsNullInstance)
 			{
-				if (cmdLoadState != null)
+				if (argParse.cmdLoadState != null)
 				{
-					LoadState(cmdLoadState, Path.GetFileName(cmdLoadState));
+					LoadState(argParse.cmdLoadState, Path.GetFileName(argParse.cmdLoadState));
 				}
-				else if (cmdLoadSlot != null)
+				else if (argParse.cmdLoadSlot != null)
 				{
-					LoadQuickSave("QuickSave" + cmdLoadSlot);
+					LoadQuickSave("QuickSave" + argParse.cmdLoadSlot);
 				}
 				else if (Global.Config.AutoLoadLastSaveSlot)
 				{
@@ -460,14 +375,14 @@ namespace BizHawk.Client.EmuHawk
 			}
 
 			//start Lua Console if requested in the command line arguments
-			if (luaConsole)
+			if (argParse.luaConsole)
 			{
 				GlobalWin.Tools.Load<LuaConsole>();
 			}
 			//load Lua Script if requested in the command line arguments
-			if (luaScript != null)
+			if (argParse.luaScript != null)
 			{
-				GlobalWin.Tools.LuaConsole.LoadLuaFile(luaScript);
+				GlobalWin.Tools.LuaConsole.LoadLuaFile(argParse.luaScript);
 			}
 
 			GlobalWin.Tools.AutoLoad();
@@ -490,9 +405,9 @@ namespace BizHawk.Client.EmuHawk
 			}
 
 			// start dumping, if appropriate
-			if (cmdDumpType != null && cmdDumpName != null)
+			if (argParse.cmdDumpType != null && argParse.cmdDumpName != null)
 			{
-				RecordAv(cmdDumpType, cmdDumpName);
+				RecordAv(argParse.cmdDumpType, argParse.cmdDumpName);
 			}
 
 			SetMainformMovieInfo();

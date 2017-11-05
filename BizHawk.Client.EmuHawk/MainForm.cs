@@ -1618,7 +1618,7 @@ namespace BizHawk.Client.EmuHawk
 			}
 		}
 
-		public void FlushSaveRAM(					)
+		public void FlushSaveRAM(bool autosave = false)
 		{
 			if (Emulator.HasSaveRam())
 			{

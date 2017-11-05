@@ -23,7 +23,7 @@ namespace BizHawk.Emulation.Cores.Atari.A7800Hawk
 	{
 		public byte ReadMemory(ushort addr)
 		{
-			MemoryCallbacks.CallReads(addr);
+			MemoryCallbacks.CallReads(addr, "System Bus");
 
 			if ((addr & 0xFCE0) == 0)
 			{
@@ -34,6 +34,7 @@ namespace BizHawk.Emulation.Cores.Atari.A7800Hawk
 				}
 				else
 				{
+					slow_access = true;
 					return tia.ReadMemory((ushort)(addr & 0x1F), false);
 				}
 			}
@@ -45,16 +46,17 @@ namespace BizHawk.Emulation.Cores.Atari.A7800Hawk
 				}
 				else
 				{
-					return 0xFF; // TODO: What if Maria is off?
+					return 0x80; // TODO: What if Maria is off?
 				}
 			}
 			else if ((addr & 0xFF80) == 0x280)
 			{
-				//return regs_6532[addr & 0x1F];
+				slow_access = true;
 				return m6532.ReadMemory(addr, false);
 			}
 			else if ((addr & 0xFE80) == 0x480)
 			{
+				slow_access = true;
 				return RAM_6532[addr & 0x7F];
 			}
 			else if ((addr >= 0x1800) && (addr < 0x2800))
@@ -98,17 +100,18 @@ namespace BizHawk.Emulation.Cores.Atari.A7800Hawk
 
 		public void WriteMemory(ushort addr, byte value)
 		{
-			MemoryCallbacks.CallWrites(addr);
+			MemoryCallbacks.CallWrites(addr, "System Bus");
 
 			if ((addr & 0xFCE0) == 0)
 			{
 				// return TIA registers or control register if it is still unlocked
 				if ((A7800_control_register & 0x1) == 0)
 				{
-					A7800_control_register = value; 
+					A7800_control_register = value;
 				}
 				else
 				{
+					slow_access = true;
 					tia.WriteMemory((ushort)(addr & 0x1F), value, false);
 				}
 			}
@@ -118,12 +121,20 @@ namespace BizHawk.Emulation.Cores.Atari.A7800Hawk
 				{
 					// register 8 is read only and controlled by Maria
 					var temp = addr & 0x1F;
+
 					if (temp != 8)
 						Maria_regs[temp] = value;
 
 					if (temp == 4) // WSYNC
 						cpu.RDY = false;
-
+					/*
+					for (int i = 0; i < 0x20; i++) 
+					{
+						Console.Write(Maria_regs[i]);
+						Console.Write(" ");
+					}
+					Console.WriteLine(maria.scanline);
+					*/
 				}
 				else
 				{
@@ -132,10 +143,12 @@ namespace BizHawk.Emulation.Cores.Atari.A7800Hawk
 			}
 			else if ((addr & 0xFF80) == 0x280)
 			{
+				slow_access = true;
 				m6532.WriteMemory(addr, value);
 			}
 			else if ((addr & 0xFE80) == 0x480)
 			{
+				slow_access = true;
 				RAM_6532[addr & 0x7F] = value;
 			}
 			else if ((addr >= 0x1800) && (addr < 0x2800))

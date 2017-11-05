@@ -6,7 +6,6 @@ using System.Windows.Forms;
 using BizHawk.Emulation.Common;
 using BizHawk.Emulation.Common.IEmulatorExtensions;
 using BizHawk.Emulation.Cores.Atari.A7800Hawk;
-using BizHawk.Emulation.Cores.Atari.Atari7800;
 using BizHawk.Emulation.Cores.Calculators;
 using BizHawk.Emulation.Cores.ColecoVision;
 using BizHawk.Emulation.Cores.Nintendo.NES;
@@ -25,6 +24,7 @@ using BizHawk.Client.EmuHawk.ToolExtensions;
 using BizHawk.Emulation.Cores.Computers.AppleII;
 using BizHawk.Client.ApiHawk;
 using BizHawk.Emulation.Cores.Computers.Commodore64;
+using BizHawk.Emulation.Cores.Nintendo.Gameboy;
 
 namespace BizHawk.Client.EmuHawk
 {
@@ -225,9 +225,9 @@ namespace BizHawk.Client.EmuHawk
 			}
 		}
 
-		private void FlushSaveRAMSubMenu_DropDownOpened(object sender, EventArgs e)
+		private void SaveRAMSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
-			FlushSaveRAMMenuItem.ShortcutKeyDisplayString = Global.Config.HotkeyBindings["Flush SRAM"].Bindings;
+			FlushSaveRAMMenuItem.ShortcutKeyDisplayString = Global.Config.HotkeyBindings["Flush SaveRAM"].Bindings;
 		}
 
 		private void MovieSubMenu_DropDownOpened(object sender, EventArgs e)
@@ -1186,7 +1186,6 @@ namespace BizHawk.Client.EmuHawk
 
 		private void CoresSubMenu_DropDownOpened(object sender, EventArgs e)
 		{
-			Atari7800CoreSubMenu.Visible = VersionInfo.DeveloperBuild;
 			GBInSGBMenuItem.Checked = Global.Config.GB_AsSGB;
 			
 			allowGameDBCoreOverridesToolStripMenuItem.Checked = Global.Config.CoreForcingViaGameDB;
@@ -1239,25 +1238,10 @@ namespace BizHawk.Client.EmuHawk
 			}
 		}
 
-		private void Atari7800CoreSubMenu_DropDownOpened(object sender, EventArgs e)
-		{
-			Emu7800CoreMenuItem.Checked = Global.Config.A78_UseEmu7800;
-			Atari7800HawkCoreMenuItem.Checked = !Global.Config.A78_UseEmu7800;
-		}
-
-		private void Atari7800CorePick_Click(object sender, EventArgs e)
-		{
-			Global.Config.A78_UseEmu7800 ^= true;
-			if (Emulator.SystemId == "A78")
-			{
-				FlagNeedsReboot();
-			}
-		}
-
 		private void SGBCoreSubmenu_DropDownOpened(object sender, EventArgs e)
 		{
 			SgbBsnesMenuItem.Checked = Global.Config.SGB_UseBsnes;
-			SgbPizzaBoyMenuItem.Checked = !Global.Config.SGB_UseBsnes;
+			SgbSameBoyMenuItem.Checked = !Global.Config.SGB_UseBsnes;
 		}
 
 		private void SgbCorePick_Click(object sender, EventArgs e)
@@ -1269,7 +1253,6 @@ namespace BizHawk.Client.EmuHawk
 				FlagNeedsReboot();
 			}
 		}
-
 
 		private void GbInSgbMenuItem_Click(object sender, EventArgs e)
 		{
@@ -1762,6 +1745,10 @@ namespace BizHawk.Client.EmuHawk
 			SMSdisplayNtscToolStripMenuItem.Checked = ss.DisplayType == "NTSC";
 			SMSdisplayPalToolStripMenuItem.Checked = ss.DisplayType == "PAL";
 			SMSdisplayAutoToolStripMenuItem.Checked = ss.DisplayType == "Auto";
+			SMSControllerStandardToolStripMenuItem.Checked = ss.ControllerType == "Standard";
+			SMSControllerPaddleToolStripMenuItem.Checked = ss.ControllerType == "Paddle";
+			SMSControllerLightPhaserToolStripMenuItem.Checked = ss.ControllerType == "Light Phaser";
+			SMSControllerSportsPadToolStripMenuItem.Checked = ss.ControllerType == "Sports Pad";
 			SMSenableBIOSToolStripMenuItem.Checked = ss.UseBIOS;
 			SMSEnableFMChipMenuItem.Checked = ss.EnableFM;
 			SMSOverclockMenuItem.Checked = ss.AllowOverlock;
@@ -1775,9 +1762,11 @@ namespace BizHawk.Client.EmuHawk
 			SMSEnableFMChipMenuItem.Visible =
 				SMSFix3DGameDisplayToolStripMenuItem.Visible =
 				SMSenableBIOSToolStripMenuItem.Visible =
-				SMSDisplayOverscanMenuItem.Visible =
 				Global.Game.System == "SMS";
 
+			SMSDisplayOverscanMenuItem.Visible =
+				Global.Game.System == "SMS" || Global.Game.System == "SG";
+			
 			SMSOverclockMenuItem.Visible =
 				SMSForceStereoMenuItem.Visible =
 				SMSdisplayToolStripMenuItem.Visible =
@@ -1914,6 +1903,34 @@ namespace BizHawk.Client.EmuHawk
 			GlobalWin.Tools.Load<SmsVDPViewer>();
 		}
 
+		private void SMSControllerStandardToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			var s = ((SMS)Emulator).GetSyncSettings();
+			s.ControllerType = "Standard";
+			PutCoreSyncSettings(s);
+		}
+
+		private void SMSControllerPaddleToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			var s = ((SMS)Emulator).GetSyncSettings();
+			s.ControllerType = "Paddle";
+			PutCoreSyncSettings(s);
+		}
+
+		private void SMSControllerLightPhaserToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			var s = ((SMS)Emulator).GetSyncSettings();
+			s.ControllerType = "Light Phaser";
+			PutCoreSyncSettings(s);
+		}
+
+		private void SMSControllerSportsPadToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			var s = ((SMS)Emulator).GetSyncSettings();
+			s.ControllerType = "Sports Pad";
+			PutCoreSyncSettings(s);
+		}
+
 		#endregion
 
 		#region TI83
@@ -1984,11 +2001,17 @@ namespace BizHawk.Client.EmuHawk
 		private void A7800SubMenu_DropDownOpened(object sender, EventArgs e)
 		{
 			A7800ControllerSettingsMenuItem.Enabled = !Global.MovieSession.Movie.IsActive;
+			A7800FilterSettingsMenuItem.Enabled = !Global.MovieSession.Movie.IsActive;
 		}
 
-		private void A7800SettingsToolStripMenuItem_Click(object sender, EventArgs e)
+		private void A7800ControllerSettingsToolStripMenuItem_Click(object sender, EventArgs e)
 		{
 			new A7800ControllerSettings().ShowDialog();
+		}
+
+		private void A7800FilterSettingsToolStripMenuItem_Click(object sender, EventArgs e)
+		{
+			new A7800FilterSettings().ShowDialog();
 		}
 
 		#endregion
@@ -2002,7 +2025,14 @@ namespace BizHawk.Client.EmuHawk
 
 		private void GBCoreSettingsMenuItem_Click(object sender, EventArgs e)
 		{
-			GBPrefs.DoGBPrefsDialog(this);
+			if (Global.Emulator is Gameboy)
+			{
+				GBPrefs.DoGBPrefsDialog(this);
+			}
+			else // sameboy
+			{
+				GenericCoreConfig.DoDialog(this, "Gameboy Settings");
+			}
 		}
 
 		private void LoadGbInSgbMenuItem_Click(object sender, EventArgs e)
@@ -2018,6 +2048,11 @@ namespace BizHawk.Client.EmuHawk
 		private void GBGameGenieMenuItem_Click(object sender, EventArgs e)
 		{
 			GlobalWin.Tools.LoadGameGenieEc();
+		}
+
+		private void GBPrinterViewerMenuItem_Click(object sender, EventArgs e)
+		{
+			GlobalWin.Tools.Load<GBPrinterView>();
 		}
 
 		#endregion

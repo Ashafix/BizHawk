@@ -8,7 +8,6 @@ using BizHawk.Emulation.Common;
 using BizHawk.Emulation.Cores;
 using BizHawk.Emulation.Cores.Libretro;
 using BizHawk.Emulation.Cores.Atari.A7800Hawk;
-using BizHawk.Emulation.Cores.Atari.Atari7800;
 using BizHawk.Emulation.Cores.Calculators;
 using BizHawk.Emulation.Cores.Computers.AppleII;
 using BizHawk.Emulation.Cores.Computers.Commodore64;
@@ -167,7 +166,7 @@ namespace BizHawk.Client.Common
 
 		private bool HandleArchiveBinding(HawkFile file)
 		{
-			var romExtensions = new[] { "SMS", "SMC", "SFC", "PCE", "SGX", "GG", "SG", "BIN", "GEN", "MD", "SMD", "GB", "NES", "FDS", "ROM", "INT", "GBC", "UNF", "A78", "CRT", "COL", "XML", "Z64", "V64", "N64", "WS", "WSC", "GBA" };
+			var romExtensions = new[] { "SMS", "SMC", "SFC", "PCE", "SGX", "GG", "SG", "BIN", "GEN", "MD", "SMD", "GB", "NES", "FDS", "ROM", "INT", "GBC", "UNF", "A78", "CRT", "COL", "XML", "Z64", "V64", "N64", "WS", "WSC", "GBA", "32X" };
 
 			// try binding normal rom extensions first
 			if (!file.IsBound)
@@ -471,7 +470,7 @@ namespace BizHawk.Client.Common
 							System = "PSX"
 						};
 					}
-					else if (ext == ".iso" || ext == ".cue" || ext == ".ccd")
+					else if (ext == ".iso" || ext == ".cue" || ext == ".ccd" || ext == ".mds")
 					{
 						if (file.IsArchive)
 						{
@@ -495,7 +494,7 @@ namespace BizHawk.Client.Common
 							throw new InvalidOperationException("\r\n" + discMountJob.OUT_Log);
 						}
 
-						var disc = discMountJob.OUT_Disc;
+						var disc = discMountJob.OUT_Disc;                        
 
 						// -----------
 						// TODO - use more sophisticated IDer
@@ -515,7 +514,9 @@ namespace BizHawk.Client.Common
 							// try to use our wizard methods
 							game = new GameInfo { Name = Path.GetFileNameWithoutExtension(file.Name), Hash = discHash };
 
-							switch (new DiscIdentifier(disc).DetectDiscType())
+                            var dt = new DiscIdentifier(disc).DetectDiscType();
+
+                            switch (dt)
 							{
 								case DiscType.SegaSaturn:
 									game.System = "SAT";
@@ -533,9 +534,23 @@ namespace BizHawk.Client.Common
 								case DiscType.PCFX:
 									game.System = "PCFX";
 									break;
+                                case DiscType.TurboCD:
+                                    game.System = "PCECD";
+                                    break;
+
+                                case DiscType.Amiga:
+                                case DiscType.CDi:
+                                case DiscType.Dreamcast:
+                                case DiscType.GameCube:
+                                case DiscType.NeoGeoCD:
+                                case DiscType.Panasonic3DO:
+                                case DiscType.Playdia:
+                                case DiscType.Wii:
+                                    // no supported emulator core for these (yet)
+                                    game.System = dt.ToString();
+                                    throw new NoAvailableCoreException(dt.ToString());
 
 								case DiscType.AudioDisc:
-								case DiscType.TurboCD:
 								case DiscType.UnknownCDFS:
 								case DiscType.UnknownFormat:
 									if (PreferredPlatformIsDefined(ext))
@@ -544,7 +559,7 @@ namespace BizHawk.Client.Common
 									}
 									else
 									{
-										game.System = "PCECD";
+                                        game.System = "NULL"; // "PCECD";
 									}
 
 									break;
@@ -553,8 +568,11 @@ namespace BizHawk.Client.Common
 
 						switch (game.System)
 						{
+                            case "NULL":
+                                nextEmulator = null;
+                                break;
 							case "GEN":
-								var genesis = new GPGX(nextComm, null, disc, GetCoreSettings<GPGX>(), GetCoreSyncSettings<GPGX>());
+								var genesis = new GPGX(nextComm, null, new[] { disc }, GetCoreSettings<GPGX>(), GetCoreSyncSettings<GPGX>());
 								nextEmulator = genesis;
 								break;
 							case "SAT":
@@ -728,6 +746,15 @@ namespace BizHawk.Client.Common
 
 									nextEmulator = new Tst(nextComm, pcfxDiscs,
 										(Tst.Settings)GetCoreSettings<Tst>(), (Tst.SyncSettings)GetCoreSyncSettings<Tst>());
+									break;
+								case "GEN":
+									// We are assuming discs only, for now
+									var genDiscs = DiscsFromXml(xmlGame, "GEN", DiscType.MegaCD);
+									if (!genDiscs.Any())
+									{
+										return false;
+									}
+									nextEmulator = new GPGX(nextComm, null, genDiscs, GetCoreSettings<GPGX>(), GetCoreSyncSettings<GPGX>());
 									break;
 								default:
 									return false;
@@ -911,7 +938,6 @@ namespace BizHawk.Client.Common
 							case "GBC":
 								if (!Global.Config.GB_AsSGB)
 								{
-									//core = CoreInventory.Instance["GB", "Pizza Boy"];
 									core = CoreInventory.Instance["GB", "Gambatte"];
 								}
 								else
@@ -925,24 +951,13 @@ namespace BizHawk.Client.Common
 									}
 									else
 									{
-										core = CoreInventory.Instance["SGB", "Pizza Boy"];
+										core = CoreInventory.Instance["SGB", "SameBoy"];
 									}
 								}
 								break;
 							case "A78":
-								var gamedbpath = Path.Combine(PathManager.GetExeDirectoryAbsolute(), "gamedb", "EMU7800.csv");
-
-								if (!VersionInfo.DeveloperBuild)
-								{
-									nextEmulator = new Atari7800(nextComm, game, rom.RomData, gamedbpath); // Don't expose A7800Hawk in releases yet
-								}
-								else
-								{
-									nextEmulator = Global.Config.A78_UseEmu7800
-										? nextEmulator = new Atari7800(nextComm, game, rom.RomData, gamedbpath)
-										: nextEmulator = new A7800Hawk(nextComm, game, rom.RomData, gamedbpath);
-								}
-
+								var gamedbpath = Path.Combine(PathManager.GetExeDirectoryAbsolute(), "gamedb", "gamedb_a7800.csv");
+								nextEmulator = new A7800Hawk(nextComm, game, rom.RomData, gamedbpath, GetCoreSettings<A7800Hawk>(), GetCoreSyncSettings<A7800Hawk>());
 								break;
 							case "C64":
 								var c64 = new C64(nextComm, Enumerable.Repeat(rom.RomData, 1), rom.GameInfo, GetCoreSettings<C64>(), GetCoreSyncSettings<C64>());
@@ -1033,7 +1048,14 @@ namespace BizHawk.Client.Common
 						DoMessageCallback("Failed to load a GB rom in SGB mode.  Disabling SGB Mode.");
 						return LoadRom(path, nextComm, false, recursiveCount + 1);
 					}
-					else
+
+                    // handle exceptions thrown by the new detected systems that bizhawk does not have cores for
+                    else if (ex is NoAvailableCoreException)
+                    {
+                        DoLoadErrorCallback(ex.Message + "\n\n" + ex, system);
+                    }
+
+                    else
 					{
 						DoLoadErrorCallback("A core accepted the rom, but threw an exception while loading it:\n\n" + ex, system);
 					}

@@ -144,7 +144,7 @@ namespace BizHawk.Client.EmuHawk
 				}
 				else
 				{
-					cmdRom = arg;
+					cmdRom = args[i];
 				}
 			}
 			if (URL_get != null || URL_post != null || socket_ip != null || mmf_main != null)

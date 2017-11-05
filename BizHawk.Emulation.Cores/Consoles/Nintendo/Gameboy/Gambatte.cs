@@ -19,7 +19,7 @@ namespace BizHawk.Emulation.Cores.Nintendo.Gameboy
 	[ServiceNotApplicable(typeof(IDriveLight), typeof(IDriveLight))]
 	public partial class Gameboy : IEmulator, IVideoProvider, ISoundProvider, ISaveRam, IStatable, IInputPollable, ICodeDataLogger,
 		IBoardInfo, IDebuggable, ISettable<Gameboy.GambatteSettings, Gameboy.GambatteSyncSettings>,
-		IGameboyCommon
+		IGameboyCommon, ICycleTiming, ILinkable
 	{
 		[CoreConstructor("GB", "GBC")]
 		public Gameboy(CoreComm comm, GameInfo game, byte[] file, object settings, object syncSettings, bool deterministic)
@@ -253,7 +253,8 @@ namespace BizHawk.Emulation.Cores.Nintendo.Gameboy
 		/// number of extra cycles we overran in the last frame
 		/// </summary>
 		private uint frameOverflow = 0;
-		public ulong CycleCount => _cycleCount;
+		public long CycleCount => (long)_cycleCount;
+		public double ClockRate => TICKSPERSECOND;
 
 		#endregion
 
@@ -439,7 +440,7 @@ namespace BizHawk.Emulation.Cores.Nintendo.Gameboy
 
 		#region ppudebug
 
-		public bool GetGPUMemoryAreas(out IntPtr vram, out IntPtr bgpal, out IntPtr sppal, out IntPtr oam)
+		public GPUMemoryAreas GetGPU()
 		{
 			IntPtr _vram = IntPtr.Zero;
 			IntPtr _bgpal = IntPtr.Zero;
@@ -451,23 +452,11 @@ namespace BizHawk.Emulation.Cores.Nintendo.Gameboy
 				|| !LibGambatte.gambatte_getmemoryarea(GambatteState, LibGambatte.MemoryAreas.sppal, ref _sppal, ref unused)
 				|| !LibGambatte.gambatte_getmemoryarea(GambatteState, LibGambatte.MemoryAreas.oam, ref _oam, ref unused))
 			{
-				vram = IntPtr.Zero;
-				bgpal = IntPtr.Zero;
-				sppal = IntPtr.Zero;
-				oam = IntPtr.Zero;
-				return false;
+				throw new InvalidOperationException("Unexpected error in gambatte_getmemoryarea");
 			}
-			vram = _vram;
-			bgpal = _bgpal;
-			sppal = _sppal;
-			oam = _oam;
-			return true;
-		}
+			return new GPUMemoryAreas(_vram, _oam, _sppal, _bgpal);
 
-		/// <summary>
-		/// </summary>
-		/// <param name="lcdc">current value of register $ff40 (LCDC)</param>
-		public delegate void ScanlineCallback(int lcdc);
+		}
 
 		/// <summary>
 		/// set up callback
@@ -505,6 +494,32 @@ namespace BizHawk.Emulation.Cores.Nintendo.Gameboy
 			else
 			{
 				throw new ArgumentOutOfRangeException(nameof(line), "line must be in [0, 153]");
+			}
+		}
+
+		GambattePrinter printer;
+
+		/// <summary>
+		/// set up Printer callback
+		/// </summary>
+		public void SetPrinterCallback(PrinterCallback callback)
+		{
+			// Copying SetScanlineCallback for this check, I assume this is still a bug somewhere
+			if (GambatteState == IntPtr.Zero)
+			{
+				return; // not sure how this is being reached.  tried the debugger...
+			}
+
+			if (callback != null)
+			{
+				printer = new GambattePrinter(this, callback);
+				LinkConnected = true;
+			}
+			else
+			{
+				LinkConnected = false;
+				printer.Disconnect();
+				printer = null;
 			}
 		}
 

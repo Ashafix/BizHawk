@@ -17,8 +17,6 @@ namespace BizHawk.Emulation.Cores.Consoles.Sega.gpgx
 		{
 			var temp = SaveStateBinary();
 			temp.SaveAsHexFast(writer);
-			// write extra copy of stuff we don't use
-			writer.WriteLine("Frame {0}", Frame);
 		}
 
 		public void LoadStateText(TextReader reader)
@@ -36,6 +34,9 @@ namespace BizHawk.Emulation.Cores.Consoles.Sega.gpgx
 			Frame = reader.ReadInt32();
 			LagCount = reader.ReadInt32();
 			IsLagFrame = reader.ReadBoolean();
+			_discIndex = reader.ReadInt32();
+			_prevDiskPressed = reader.ReadBoolean();
+			_nextDiskPressed = reader.ReadBoolean();
 			// any managed pointers that we sent to the core need to be resent now!
 			Core.gpgx_set_input_callback(InputCallback);
 			RefreshMemCallbacks();
@@ -51,6 +52,9 @@ namespace BizHawk.Emulation.Cores.Consoles.Sega.gpgx
 			writer.Write(Frame);
 			writer.Write(LagCount);
 			writer.Write(IsLagFrame);
+			writer.Write(_discIndex);
+			writer.Write(_prevDiskPressed);
+			writer.Write(_nextDiskPressed);
 		}
 
 		public byte[] SaveStateBinary()

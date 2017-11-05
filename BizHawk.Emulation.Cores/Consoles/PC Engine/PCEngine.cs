@@ -22,7 +22,7 @@ namespace BizHawk.Emulation.Cores.PCEngine
 		[CoreConstructor("PCE", "SGX")]
 		public PCEngine(CoreComm comm, GameInfo game, byte[] rom, object settings, object syncSettings)
 		{
-			MemoryCallbacks = new MemoryCallbackSystem();
+			MemoryCallbacks = new MemoryCallbackSystem(new[] { "System Bus" });
 			CoreComm = comm;
 
 			switch (game.System)
@@ -41,13 +41,19 @@ namespace BizHawk.Emulation.Cores.PCEngine
 			Settings = (PCESettings)settings ?? new PCESettings();
 			_syncSettings = (PCESyncSettings)syncSettings ?? new PCESyncSettings();
 			Init(game, rom);
-			SetControllerButtons();
+
+			_controllerDeck = new PceControllerDeck(
+				_syncSettings.Port1,
+				_syncSettings.Port2,
+				_syncSettings.Port3,
+				_syncSettings.Port4,
+				_syncSettings.Port5);
 		}
 
 		public PCEngine(CoreComm comm, GameInfo game, Disc disc, object Settings, object syncSettings)
 		{
 			CoreComm = comm;
-			MemoryCallbacks = new MemoryCallbackSystem();
+			MemoryCallbacks = new MemoryCallbackSystem(new[] { "System Bus" });
 			DriveLightEnabled = true;
 			SystemId = "PCECD";
 			Type = NecSystemType.TurboCD;
@@ -96,7 +102,13 @@ namespace BizHawk.Emulation.Cores.PCEngine
 
 			// the default RomStatusDetails don't do anything with Disc
 			CoreComm.RomStatusDetails = string.Format("{0}\r\nDisk partial hash:{1}", game.Name, new DiscSystem.DiscHasher(disc).OldHash());
-			SetControllerButtons();
+
+			_controllerDeck = new PceControllerDeck(
+				_syncSettings.Port1,
+				_syncSettings.Port2,
+				_syncSettings.Port3,
+				_syncSettings.Port4,
+				_syncSettings.Port5);
 		}
 
 		// ROM

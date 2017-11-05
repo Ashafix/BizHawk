@@ -3413,7 +3413,7 @@ namespace BizHawk.Client.EmuHawk
 					AbortAv();
 				}
 
-			HANDLE_AUTODUMP:
+				HANDLE_AUTODUMP:
 				if (argParse._autoDumpLength > 0)
 				{
 					argParse._autoDumpLength--;
@@ -3608,7 +3608,7 @@ namespace BizHawk.Client.EmuHawk
 
 				if (result)
 				{
-					
+
 					string loaderName = "*" + OpenAdvancedSerializer.Serialize(ioa);
 					Emulator = loader.LoadedEmulator;
 					Global.Game = loader.Game;

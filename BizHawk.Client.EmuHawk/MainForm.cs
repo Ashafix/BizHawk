@@ -274,7 +274,7 @@ namespace BizHawk.Client.EmuHawk
 			if (argParse.cmdRom != null)
 			{
 				// Commandline should always override auto-load
-                                var ioa = OpenAdvancedSerializer.ParseWithLegacy(argParse.cmdRom);
+				var ioa = OpenAdvancedSerializer.ParseWithLegacy(argParse.cmdRom);
 				LoadRom(argParse.cmdRom, new LoadRomArgs { OpenAdvanced = ioa });
 				if (Global.Game == null)
 				{
@@ -1416,7 +1416,7 @@ namespace BizHawk.Client.EmuHawk
 
 		public PresentationPanel PresentationPanel { get; }
 
-                //countdown for saveram autoflushing
+		//countdown for saveram autoflushing
 		public int AutoFlushSaveRamIn { get; set; }
 		#endregion
 
@@ -1570,7 +1570,7 @@ namespace BizHawk.Client.EmuHawk
 			{
 				try // zero says: this is sort of sketchy... but this is no time for rearchitecting
 				{
-                                        if (Global.Config.AutosaveSaveRAM)
+					if (Global.Config.AutosaveSaveRAM)
 					{
 						var saveram = new FileInfo(PathManager.SaveRamPath(Global.Game));
 						var autosave = new FileInfo(PathManager.AutoSaveRamPath(Global.Game));
@@ -1580,7 +1580,7 @@ namespace BizHawk.Client.EmuHawk
 						}
 					}					
 
-                                        byte[] sram;
+					byte[] sram;
 
 					// GBA meteor core might not know how big the saveram ought to be, so just send it the whole file
 					// GBA vba-next core will try to eat anything, regardless of size

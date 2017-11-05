@@ -1403,5 +1403,10 @@ namespace BizHawk.Client.EmuHawk
 		}
 
 		#endregion
+
+		private void OutputBox_TextChanged(object sender, EventArgs e)
+		{
+
+		}
 	}
 }

@@ -394,4 +394,5 @@ namespace BizHawk.Client.EmuHawk
 			GlobalWin.MainForm.FlushSaveRAM();
 		}
 	}
+
 }

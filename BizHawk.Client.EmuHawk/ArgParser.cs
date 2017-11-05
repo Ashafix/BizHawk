@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
+using System.Windows.Forms;
 
 namespace BizHawk.Client.EmuHawk
 {
@@ -27,11 +28,18 @@ namespace BizHawk.Client.EmuHawk
 		public bool luaConsole = false;
 		public int socket_port = 9999;
 		public string socket_ip = null;
+		public string mmf_main = null;
+		public string mmf_index = null;
+		public string mmf_response = null;
+		public string mmf_prefix= null;
+		public string URL_get = null;
+		public string URL_post = null;
+		
+		public void ParseArguments(string[] args)
 
-		public void parseArguments(string[] args)
-			
 		{
-			for (int i = 0; i<args.Length; i++)
+			
+			for (int i = 0; i < args.Length; i++)
 			{
 				// For some reason sometimes visual studio will pass this to us on the commandline. it makes no sense.
 				if (args[i] == ">")
@@ -110,9 +118,83 @@ namespace BizHawk.Client.EmuHawk
 				{
 					socket_ip = arg.Substring(arg.IndexOf('=') + 1);
 				}
+				else if (arg.StartsWith("--mmf_main="))
+				{
+					mmf_main = arg.Substring(arg.IndexOf('=') + 1);
+				}
+				else if (arg.StartsWith("--mmf_index="))
+				{
+					mmf_index = arg.Substring(arg.IndexOf('=') + 1);
+				}
+				else if (arg.StartsWith("--mmf_prefix="))
+				{
+					mmf_prefix = arg.Substring(arg.IndexOf('=') + 1);
+				}
+				else if (arg.StartsWith("--mmf_response="))
+				{
+					mmf_response = arg.Substring(arg.IndexOf('=') + 1);
+				}
+				else if (arg.StartsWith("--url_get="))
+				{
+					URL_get = arg.Substring(arg.IndexOf('=') + 1);
+				}
+				else if (arg.StartsWith("--url_post="))
+				{
+					URL_post = arg.Substring(arg.IndexOf('=') + 1);
+				}
 				else
 				{
 					cmdRom = arg;
+				}
+			}
+			if (URL_get != null || URL_post != null || socket_ip != null || mmf_main != null)
+			{
+				
+					////initialize HTTP communication
+					if (URL_get != null)
+				{
+					GlobalWin.httpCommunication.initialized = true;
+					GlobalWin.httpCommunication.SetGetUrl(URL_get);
+				}
+				if (URL_post != null)
+				{
+					GlobalWin.httpCommunication.initialized = true;
+					GlobalWin.httpCommunication.SetPostUrl(URL_post);
+				}
+
+				//inititalize socket server
+				if (socket_ip != null && socket_port > -1)
+				{
+					GlobalWin.socketServer.initialized = true;
+					GlobalWin.socketServer.SetIp(socket_ip, socket_port);
+				}
+				else if (socket_ip != null)
+				{
+					GlobalWin.socketServer.initialized = true;
+					GlobalWin.socketServer.SetIp(socket_ip);
+				}
+
+				//initialize mapped memory files
+				if (mmf_prefix != null)
+				{
+					mmf_main = mmf_prefix + "_main";
+					mmf_index = mmf_prefix + "_index";
+					mmf_response = mmf_prefix + "_response";
+				}
+				if (mmf_main != null && mmf_index != null && mmf_response != null)
+				{
+					GlobalWin.memoryMappedFiles.initialized = true;
+					GlobalWin.memoryMappedFiles.SetFilenames(mmf_main, mmf_index, mmf_response);
+				}
+				else if (mmf_main != null && mmf_index != null)
+				{
+					GlobalWin.memoryMappedFiles.initialized = true;
+					GlobalWin.memoryMappedFiles.SetFilenames(mmf_main, mmf_index);
+				}
+				else if (mmf_main != null)
+				{
+					GlobalWin.memoryMappedFiles.initialized = true;
+					GlobalWin.memoryMappedFiles.SetFilenames(mmf_main);
 				}
 			}
 		}

@@ -53,24 +53,24 @@ namespace BizHawk.Client.EmuHawk
 				var arg = args[i].ToLower();
 				if (arg.StartsWith("--load-slot="))
 				{
-					cmdLoadSlot = arg.Substring(arg.IndexOf('=') + 1);
+					cmdLoadSlot = args[i].Substring(arg.IndexOf('=') + 1);
 				}
 
 				if (arg.StartsWith("--load-state="))
 				{
-					cmdLoadState = arg.Substring(arg.IndexOf('=') + 1);
+					cmdLoadState = args[i].Substring(arg.IndexOf('=') + 1);
 				}
 				else if (arg.StartsWith("--movie="))
 				{
-					cmdMovie = arg.Substring(arg.IndexOf('=') + 1);
+					cmdMovie = args[i].Substring(arg.IndexOf('=') + 1);
 				}
 				else if (arg.StartsWith("--dump-type="))
 				{
-					cmdDumpType = arg.Substring(arg.IndexOf('=') + 1);
+					cmdDumpType = args[i].Substring(arg.IndexOf('=') + 1);
 				}
 				else if (arg.StartsWith("--dump-frames="))
 				{
-					var list = arg.Substring(arg.IndexOf('=') + 1);
+					var list = args[i].Substring(arg.IndexOf('=') + 1);
 					var items = list.Split(',');
 					_currAviWriterFrameList = new HashSet<int>();
 					foreach (string item in items)
@@ -83,11 +83,11 @@ namespace BizHawk.Client.EmuHawk
 				}
 				else if (arg.StartsWith("--dump-name="))
 				{
-					cmdDumpName = arg.Substring(arg.IndexOf('=') + 1);
+					cmdDumpName = args[i].Substring(arg.IndexOf('=') + 1);
 				}
 				else if (arg.StartsWith("--dump-length="))
 				{
-					int.TryParse(arg.Substring(arg.IndexOf('=') + 1), out _autoDumpLength);
+					int.TryParse(args[i].Substring(arg.IndexOf('=') + 1), out _autoDumpLength);
 				}
 				else if (arg.StartsWith("--dump-close"))
 				{
@@ -103,7 +103,7 @@ namespace BizHawk.Client.EmuHawk
 				}
 				else if (arg.StartsWith("--lua="))
 				{
-					luaScript = arg.Substring(arg.IndexOf('=') + 1);
+					luaScript = args[i].Substring(arg.IndexOf('=') + 1);
 					luaConsole = true;
 				}
 				else if (arg.StartsWith("--luaconsole"))
@@ -120,27 +120,27 @@ namespace BizHawk.Client.EmuHawk
 				}
 				else if (arg.StartsWith("--mmf_main="))
 				{
-					mmf_main = arg.Substring(arg.IndexOf('=') + 1);
+					mmf_main = args[i].Substring(arg.IndexOf('=') + 1);
 				}
 				else if (arg.StartsWith("--mmf_index="))
 				{
-					mmf_index = arg.Substring(arg.IndexOf('=') + 1);
+					mmf_index = args[i].Substring(arg.IndexOf('=') + 1);
 				}
 				else if (arg.StartsWith("--mmf_prefix="))
 				{
-					mmf_prefix = arg.Substring(arg.IndexOf('=') + 1);
+					mmf_prefix = args[i].Substring(arg.IndexOf('=') + 1);
 				}
 				else if (arg.StartsWith("--mmf_response="))
 				{
-					mmf_response = arg.Substring(arg.IndexOf('=') + 1);
+					mmf_response = args[i].Substring(arg.IndexOf('=') + 1);
 				}
 				else if (arg.StartsWith("--url_get="))
 				{
-					URL_get = arg.Substring(arg.IndexOf('=') + 1);
+					URL_get = args[i].Substring(arg.IndexOf('=') + 1);
 				}
 				else if (arg.StartsWith("--url_post="))
 				{
-					URL_post = arg.Substring(arg.IndexOf('=') + 1);
+					URL_post = args[i].Substring(arg.IndexOf('=') + 1);
 				}
 				else
 				{

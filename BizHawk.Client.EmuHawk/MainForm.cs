@@ -155,7 +155,7 @@ namespace BizHawk.Client.EmuHawk
 				}
 			};
 
-			argParse.parseArguments(args);
+			argParse.ParseArguments(args);
 
 			Database.LoadDatabase(Path.Combine(PathManager.GetExeDirectoryAbsolute(), "gamedb", "gamedb.txt"));
 
@@ -310,7 +310,7 @@ namespace BizHawk.Client.EmuHawk
 					if (MovieImport.IsValidMovieExtension(Path.GetExtension(argParse.cmdMovie)))
 					{
 						string errorMsg;
-						string warningMsg;
+							string warningMsg;
 						var imported = MovieImport.ImportFile(argParse.cmdMovie, out errorMsg, out warningMsg);
 						if (!string.IsNullOrEmpty(errorMsg))
 						{

@@ -235,7 +235,8 @@
             this.ExperimentalToolsSubMenu = new System.Windows.Forms.ToolStripMenuItem();
             this.AutoHawkMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.NewHexEditorMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.NESSubMenu = new System.Windows.Forms.ToolStripMenuItem();
+			this.CommunicationMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			this.NESSubMenu = new System.Windows.Forms.ToolStripMenuItem();
             this.coreToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.quickNESToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.nesHawkToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -2215,7 +2216,8 @@
             // 
             this.ExperimentalToolsSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.AutoHawkMenuItem,
-            this.NewHexEditorMenuItem});
+            this.NewHexEditorMenuItem,
+			this.CommunicationMenuItem});
             this.ExperimentalToolsSubMenu.Name = "ExperimentalToolsSubMenu";
             this.ExperimentalToolsSubMenu.Size = new System.Drawing.Size(191, 22);
             this.ExperimentalToolsSubMenu.Text = "Experimental Tools";
@@ -2234,10 +2236,17 @@
             this.NewHexEditorMenuItem.Size = new System.Drawing.Size(155, 22);
             this.NewHexEditorMenuItem.Text = "New Hex Editor";
             this.NewHexEditorMenuItem.Click += new System.EventHandler(this.NewHexEditorMenuItem_Click);
-            // 
-            // NESSubMenu
-            // 
-            this.NESSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+			// 
+			// CommunicationMenuItem
+			// 
+			this.CommunicationMenuItem.Name = "CommunicationMenu";
+			this.CommunicationMenuItem.Size = new System.Drawing.Size(155, 22);
+			this.CommunicationMenuItem.Text = "Communication";
+			this.CommunicationMenuItem.Click += new System.EventHandler(this.CommunicationMenuItem_Click);
+			// 
+			// NESSubMenu
+			// 
+			this.NESSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.coreToolStripMenuItem,
             this.toolStripSeparator34,
             this.NESPPUViewerMenuItem,
@@ -4408,6 +4417,7 @@
 		private System.Windows.Forms.ToolStripMenuItem ExperimentalToolsSubMenu;
 		private System.Windows.Forms.ToolStripMenuItem AutoHawkMenuItem;
 		private System.Windows.Forms.ToolStripMenuItem NewHexEditorMenuItem;
+		private System.Windows.Forms.ToolStripMenuItem CommunicationMenuItem;
 		private System.Windows.Forms.ToolStripMenuItem SaveConfigAsMenuItem;
 		private System.Windows.Forms.ToolStripMenuItem LoadConfigFromMenuItem;
 		private System.Windows.Forms.ToolStripMenuItem SaveMovieAsMenuItem;

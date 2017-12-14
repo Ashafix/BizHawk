@@ -1512,11 +1512,6 @@ namespace BizHawk.Client.EmuHawk
 			GlobalWin.Tools.Load<NewHexEditor>();
 		}
 
-		private void CommunicationMenuItem_Click(object sender, EventArgs e)
-		{
-			GlobalWin.httpCommunication.SendScreenshot();
-		}
-
 		#endregion
 
 		#region NES

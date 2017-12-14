@@ -41,12 +41,12 @@ namespace BizHawk.Client.EmuHawk
 			return list.ToString();
 		}
 
-		[LuaMethod("SocketServerScreenShot", "sends a screen shot to the Socket server")]
+		[LuaMethod("SocketServerScreenShot", "sends a screenshot to the Socket server")]
 		public string SocketServerScreenShot()
 		{
 			return GlobalWin.socketServer.SendScreenshot();
 		}
-		[LuaMethod("SocketServerScreenShotResponse", "sends a screen shot to the Socket server and retrieves the response")]
+		[LuaMethod("SocketServerScreenShotResponse", "sends a screenshot to the Socket server and retrieves the response")]
 		public string SocketServerScreenShotResponse()
 		{
 			return GlobalWin.socketServer.SendScreenshot(1000).ToString();
@@ -111,7 +111,7 @@ namespace BizHawk.Client.EmuHawk
 			list.AppendLine("done testing");
 			return list.ToString();
 		}
-		[LuaMethod("httpTestGet", "tests HTTP GET connections")]
+		[LuaMethod("httpTestGet", "tests the HTTP GET connection")]
 		public string HttpTestGet()
 		{
 			return GlobalWin.httpCommunication.TestGet();

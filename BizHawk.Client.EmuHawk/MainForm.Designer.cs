@@ -235,7 +235,8 @@
             this.ExperimentalToolsSubMenu = new System.Windows.Forms.ToolStripMenuItem();
             this.AutoHawkMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.NewHexEditorMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.NESSubMenu = new System.Windows.Forms.ToolStripMenuItem();
+			this.CommunicationMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			this.NESSubMenu = new System.Windows.Forms.ToolStripMenuItem();
             this.coreToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.quickNESToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.nesHawkToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -450,6 +451,7 @@
             this.SMSControllerPaddleToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.SMSControllerLightPhaserToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.SMSControllerSportsPadToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+			this.SMSControllerKeyboardToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
 			this.MainformMenu.SuspendLayout();
             this.MainStatusBar.SuspendLayout();
             this.MainFormContextMenu.SuspendLayout();
@@ -2214,7 +2216,8 @@
             // 
             this.ExperimentalToolsSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.AutoHawkMenuItem,
-            this.NewHexEditorMenuItem});
+            this.NewHexEditorMenuItem,
+			this.CommunicationMenuItem});
             this.ExperimentalToolsSubMenu.Name = "ExperimentalToolsSubMenu";
             this.ExperimentalToolsSubMenu.Size = new System.Drawing.Size(191, 22);
             this.ExperimentalToolsSubMenu.Text = "Experimental Tools";
@@ -2233,10 +2236,17 @@
             this.NewHexEditorMenuItem.Size = new System.Drawing.Size(155, 22);
             this.NewHexEditorMenuItem.Text = "New Hex Editor";
             this.NewHexEditorMenuItem.Click += new System.EventHandler(this.NewHexEditorMenuItem_Click);
-            // 
-            // NESSubMenu
-            // 
-            this.NESSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+			// 
+			// CommunicationMenuItem
+			// 
+			this.CommunicationMenuItem.Name = "CommunicationMenu";
+			this.CommunicationMenuItem.Size = new System.Drawing.Size(155, 22);
+			this.CommunicationMenuItem.Text = "Communication";
+			this.CommunicationMenuItem.Click += new System.EventHandler(this.CommunicationMenuItem_Click);
+			// 
+			// NESSubMenu
+			// 
+			this.NESSubMenu.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.coreToolStripMenuItem,
             this.toolStripSeparator34,
             this.NESPPUViewerMenuItem,
@@ -2584,7 +2594,8 @@
             this.SMSControllerStandardToolStripMenuItem,
             this.SMSControllerPaddleToolStripMenuItem,
             this.SMSControllerLightPhaserToolStripMenuItem,
-			this.SMSControllerSportsPadToolStripMenuItem});
+			this.SMSControllerSportsPadToolStripMenuItem,
+			this.SMSControllerKeyboardToolStripMenuItem});
             // 
             // SMSControllerStandardToolStripMenuItem
             // 
@@ -2609,6 +2620,12 @@
 			this.SMSControllerSportsPadToolStripMenuItem.Name = "SMSControllerSportsPadToolStripMenuItem";
 			this.SMSControllerSportsPadToolStripMenuItem.Text = "Sports Pad";
 			this.SMSControllerSportsPadToolStripMenuItem.Click += new System.EventHandler(this.SMSControllerSportsPadToolStripMenuItem_Click);
+			// 
+			// SMSControllerKeyboardToolStripMenuItem
+			// 
+			this.SMSControllerKeyboardToolStripMenuItem.Name = "SMSControllerKeyboardToolStripMenuItem";
+			this.SMSControllerKeyboardToolStripMenuItem.Text = "Keyboard";
+			this.SMSControllerKeyboardToolStripMenuItem.Click += new System.EventHandler(this.SMSControllerKeyboardToolStripMenuItem_Click);
 
 			// 
 			// SMSdisplayPalToolStripMenuItem
@@ -4400,6 +4417,7 @@
 		private System.Windows.Forms.ToolStripMenuItem ExperimentalToolsSubMenu;
 		private System.Windows.Forms.ToolStripMenuItem AutoHawkMenuItem;
 		private System.Windows.Forms.ToolStripMenuItem NewHexEditorMenuItem;
+		private System.Windows.Forms.ToolStripMenuItem CommunicationMenuItem;
 		private System.Windows.Forms.ToolStripMenuItem SaveConfigAsMenuItem;
 		private System.Windows.Forms.ToolStripMenuItem LoadConfigFromMenuItem;
 		private System.Windows.Forms.ToolStripMenuItem SaveMovieAsMenuItem;
@@ -4445,5 +4463,6 @@
 		private System.Windows.Forms.ToolStripMenuItem SMSControllerPaddleToolStripMenuItem;
 		private System.Windows.Forms.ToolStripMenuItem SMSControllerLightPhaserToolStripMenuItem;
 		private System.Windows.Forms.ToolStripMenuItem SMSControllerSportsPadToolStripMenuItem;
+		private System.Windows.Forms.ToolStripMenuItem SMSControllerKeyboardToolStripMenuItem;
 	}
 }

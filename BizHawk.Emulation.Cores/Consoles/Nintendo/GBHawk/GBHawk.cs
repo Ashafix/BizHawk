@@ -5,6 +5,9 @@ using BizHawk.Emulation.Common;
 using BizHawk.Emulation.Common.Components.LR35902;
 using BizHawk.Common.NumberExtensions;
 
+using BizHawk.Emulation.Cores.Consoles.Nintendo.Gameboy;
+using System.Runtime.InteropServices;
+
 namespace BizHawk.Emulation.Cores.Nintendo.GBHawk
 {
 	[Core(
@@ -13,7 +16,7 @@ namespace BizHawk.Emulation.Cores.Nintendo.GBHawk
 		isPorted: false,
 		isReleased: false)]
 	[ServiceNotApplicable(typeof(IDriveLight))]
-	public partial class GBHawk : IEmulator, ISaveRam, IDebuggable, IStatable, IInputPollable, IRegionable,
+	public partial class GBHawk : IEmulator, ISaveRam, IDebuggable, IStatable, IInputPollable, IRegionable, IGameboyCommon,
 	ISettable<GBHawk.GBSettings, GBHawk.GBSyncSettings>
 	{
 		// this register controls whether or not the GB BIOS is mapped into memory
@@ -48,6 +51,8 @@ namespace BizHawk.Emulation.Cores.Nintendo.GBHawk
 		public byte[] cart_RAM;
 
 		private int _frame = 0;
+
+		public bool Use_RTC;
 
 		public MapperBase mapper;
 
@@ -119,8 +124,92 @@ namespace BizHawk.Emulation.Cores.Nintendo.GBHawk
 			ser.Register<ITraceable>(_tracer);
 
 			SetupMemoryDomains();
-			HardReset();		
+			HardReset();
+
+			iptr0 = Marshal.AllocHGlobal(CHR_RAM.Length + BG_map_1.Length + BG_map_2.Length + 1);
+			iptr1 = Marshal.AllocHGlobal(OAM.Length + 1);
+			iptr2 = Marshal.AllocHGlobal(color_palette.Length * 2 * 8 + 1);
+			iptr3 = Marshal.AllocHGlobal(color_palette.Length * 8 + 1);
+
+			_scanlineCallback = null;
 		}
+
+		#region GPUViewer
+
+		public bool IsCGBMode() => false;
+
+		public IntPtr iptr0 = IntPtr.Zero;
+		public IntPtr iptr1 = IntPtr.Zero;
+		public IntPtr iptr2 = IntPtr.Zero;
+		public IntPtr iptr3 = IntPtr.Zero;
+
+		private GPUMemoryAreas _gpuMemory
+		{
+			get
+			{
+				byte[] temp = new byte[CHR_RAM.Length + BG_map_1.Length + BG_map_2.Length];
+
+				for (int i = 0; i < CHR_RAM.Length; i++)
+				{
+					temp[i] = CHR_RAM[i];
+				}
+				for (int i = 0; i < BG_map_1.Length; i++)
+				{
+					temp[CHR_RAM.Length + i] = BG_map_1[i];
+				}
+				for (int i = 0; i < BG_map_2.Length; i++)
+				{
+					temp[CHR_RAM.Length + BG_map_1.Length + i] = BG_map_2[i];
+				}
+
+				Marshal.Copy(temp, 0, iptr0, temp.Length);
+				Marshal.Copy(OAM, 0, iptr1, OAM.Length);
+
+				int[] cp2 = new int[8];
+				for (int i = 0; i < 4; i++)
+				{
+					cp2[i] = (int)color_palette[(ppu.obj_pal_0 >> (i * 2)) & 3];
+					cp2[i + 4] = (int)color_palette[(ppu.obj_pal_1 >> (i * 2)) & 3];
+				}
+				Marshal.Copy(cp2, 0, iptr2, cp2.Length);
+
+				int[] cp = new int[4];
+				for (int i = 0; i < 4; i++)
+				{
+					cp[i] = (int)color_palette[(ppu.BGP >> (i * 2)) & 3];
+				}
+				Marshal.Copy(cp, 0, iptr3, cp.Length);
+
+
+				return new GPUMemoryAreas(iptr0, iptr1, iptr2, iptr3);
+			}
+		} 
+
+		public GPUMemoryAreas GetGPU() => _gpuMemory;
+
+		public ScanlineCallback _scanlineCallback;
+		public int _scanlineCallbackLine = 0;
+
+		public void SetScanlineCallback(ScanlineCallback callback, int line)
+		{
+			_scanlineCallback = callback;
+			_scanlineCallbackLine = line;
+
+			if (line == -2)
+			{
+				GetGPU();
+				_scanlineCallback(ppu.LCDC);
+			}
+		}
+
+		private PrinterCallback _printerCallback = null;
+
+		public void SetPrinterCallback(PrinterCallback callback)
+		{
+			_printerCallback = null;
+		}
+
+		#endregion
 
 		public DisplayType Region => DisplayType.NTSC;
 
@@ -131,6 +220,12 @@ namespace BizHawk.Emulation.Cores.Nintendo.GBHawk
 			GB_bios_register = 0; // bios enable
 			in_vblank = true; // we start off in vblank since the LCD is off
 			in_vblank_old = true;
+
+			// Start off with RAM all 0xFF (the game 'X' (proto) expects this)
+			for (int i = 0; i < RAM.Length; i++)
+			{
+				RAM[i] = 0xFF;
+			}
 
 			Register_Reset();
 			timer.Reset();
@@ -256,6 +351,53 @@ namespace BizHawk.Emulation.Cores.Nintendo.GBHawk
 
 			mapper.Core = this;
 			mapper.Initialize();
+
+			if (cart_RAM != null)
+			{
+
+				Console.Write("RAM: "); Console.WriteLine(cart_RAM.Length);
+
+				if (_syncSettings.Use_SRAM)
+				{
+					// load cartRAM here
+				}
+				else
+				{
+					for (int i = 0; i < cart_RAM.Length; i++)
+					{
+						cart_RAM[i] = 0xFF;
+					}
+				}
+			}
+			
+
+			// Extra RTC initialization for mbc3
+			if (mppr == "MBC3")
+			{
+				Use_RTC = true;
+				int days = (int)Math.Floor(_syncSettings.RTCInitialTime / 86400.0);
+
+				int days_upper = ((days & 0x100) >> 8) | ((days & 0x200) >> 2);
+
+				mapper.RTC_Get((byte)days_upper, 4);
+				mapper.RTC_Get((byte)(days & 0xFF), 3);
+
+				int remaining = _syncSettings.RTCInitialTime - (days * 86400);
+
+				int hours = (int)Math.Floor(remaining / 3600.0);
+
+				mapper.RTC_Get((byte)(hours & 0xFF), 2);
+
+				remaining = remaining - (hours * 3600);
+
+				int minutes = (int)Math.Floor(remaining / 60.0);
+
+				mapper.RTC_Get((byte)(minutes & 0xFF), 1);
+
+				remaining = remaining - (minutes * 60);
+
+				mapper.RTC_Get((byte)(remaining & 0xFF), 0);
+			}
 		}
 	}
 }

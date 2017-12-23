@@ -90,8 +90,8 @@ function test_socketresponse()
 			i = i - 1;
 		end
 		if i > -100 then
-			print("Best timeout: " .. timeout)
-			print("Best time:    " .. (os.clock() - t - baseline))
+			print("Best timeout: " .. timeout .. " msecs")
+			print("Best time:    " .. round((os.clock() - t - baseline), 3) .. " secs")
 			break
 		end
 	end

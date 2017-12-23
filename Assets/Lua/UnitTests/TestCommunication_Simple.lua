@@ -88,4 +88,4 @@ end
 
 
 print("\nTests finished")
-print("Please run TestCommunication_Full.lua with the supplied Python server for a more comprehensive test")
+print("Please run TestCommunication_All.lua with the supplied Python server for a more comprehensive test")

@@ -310,7 +310,7 @@ namespace BizHawk.Client.EmuHawk
 					if (MovieImport.IsValidMovieExtension(Path.GetExtension(argParse.cmdMovie)))
 					{
 						string errorMsg;
-							string warningMsg;
+						string warningMsg;
 						var imported = MovieImport.ImportFile(argParse.cmdMovie, out errorMsg, out warningMsg);
 						if (!string.IsNullOrEmpty(errorMsg))
 						{

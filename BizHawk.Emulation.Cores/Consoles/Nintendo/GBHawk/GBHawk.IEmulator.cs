@@ -2,6 +2,7 @@
 using BizHawk.Emulation.Common;
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace BizHawk.Emulation.Cores.Nintendo.GBHawk
 {
@@ -36,7 +37,6 @@ namespace BizHawk.Emulation.Cores.Nintendo.GBHawk
 				color_palette[3] = color_palette_Gr[3];
 			}
 
-
 			if (_tracer.Enabled)
 			{
 				cpu.TraceCallback = s => _tracer.Put(s);
@@ -60,6 +60,12 @@ namespace BizHawk.Emulation.Cores.Nintendo.GBHawk
 			GetControllerState(controller);
 
 			do_frame();
+
+			if (_scanlineCallback != null)
+			{
+				GetGPU();
+				_scanlineCallback(ppu.LCDC);
+			}
 
 			if (_islag)
 			{
@@ -96,9 +102,7 @@ namespace BizHawk.Emulation.Cores.Nintendo.GBHawk
 				input_register |= 0xF;
 			}
 
-			// check for interrupts
-
-			
+			// check for interrupts			
 			if (((contr_prev & 8) > 0) && ((input_register & 8) == 0) ||
 				((contr_prev & 4) > 0) && ((input_register & 4) == 0) ||
 				((contr_prev & 2) > 0) && ((input_register & 2) == 0) ||
@@ -108,8 +112,7 @@ namespace BizHawk.Emulation.Cores.Nintendo.GBHawk
 				REG_FF0F |= 0x10;
 			}
 			
-
-			while (!vblank_rise && (ticker < 100000))
+			while (!vblank_rise)
 			{
 				audio.tick();
 				timer.tick_1();
@@ -126,7 +129,10 @@ namespace BizHawk.Emulation.Cores.Nintendo.GBHawk
 				{
 					vblank_rise = true;
 				}
+
 				ticker++;
+				if (ticker > 10000000) { throw new Exception("ERROR: Unable to Resolve Frame"); }
+
 				in_vblank_old = in_vblank;
 			}
 
@@ -161,9 +167,11 @@ namespace BizHawk.Emulation.Cores.Nintendo.GBHawk
 
 		public void Dispose()
 		{
-
+			Marshal.FreeHGlobal(iptr0);
+			Marshal.FreeHGlobal(iptr1);
+			Marshal.FreeHGlobal(iptr2);
+			Marshal.FreeHGlobal(iptr3);
 		}
-
 
 		#region Video provider
 
@@ -173,7 +181,15 @@ namespace BizHawk.Emulation.Cores.Nintendo.GBHawk
 
 		public int[] GetVideoBuffer()
 		{
-			return _vidbuffer;
+			if (ppu.blank_frame)
+			{
+				for (int i = 0; i < _vidbuffer.Length; i++)
+				{
+					_vidbuffer[i] = (int)color_palette[0];
+				}
+				ppu.blank_frame = false;
+			}
+			return _vidbuffer;		
 		}
 
 		public int VirtualWidth => 160;

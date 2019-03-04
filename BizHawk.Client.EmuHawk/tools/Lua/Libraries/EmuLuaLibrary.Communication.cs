@@ -80,7 +80,15 @@ namespace BizHawk.Client.EmuHawk
 		[LuaMethod("socketServerSetIp", "sets the IP address of the Lua socket server")]
 		public void SocketServerSetIp(string ip)
 		{
-			GlobalWin.socketServer?.SetIp(ip);
+			try
+			{
+				GlobalWin.socketServer?.SetIp(ip);
+			}
+			catch (Exception e)
+			{
+				Log(e.Message);
+			}
+			
 		}
 
 		[LuaMethod("socketServerSetPort", "sets the port of the Lua socket server")]

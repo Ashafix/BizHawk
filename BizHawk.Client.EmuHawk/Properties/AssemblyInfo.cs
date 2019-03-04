@@ -33,3 +33,5 @@ using System.Runtime.InteropServices;
 // [assembly: AssemblyVersion("1.0.*")]
 [assembly: AssemblyVersion(VersionInfo.Mainversion + "." + SubWCRev.SVN_REV)]
 [assembly: AssemblyFileVersion(VersionInfo.Mainversion + "." + SubWCRev.SVN_REV)]
+
+[assembly: InternalsVisibleTo("UnitTests")]
